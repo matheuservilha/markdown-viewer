@@ -8,16 +8,31 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { readDir, readFile, stat, writeFile } from '@tauri-apps/plugin-fs'
 import {
+  copyFile,
+  mkdir,
+  readDir,
+  readFile,
+  rename,
+  stat,
+  writeFile,
+  writeTextFile,
+} from '@tauri-apps/plugin-fs'
+import {
+  baseName,
   compareEntries,
+  copyName,
   entryId,
   joinPath,
+  parentPath,
   type Base,
   type Entry,
   type FileSystem,
   type FileVersion,
   type LoadedFile,
+  type LooseFile,
+  type Capabilities,
+  type Restored,
 } from './fs'
 import { decode } from './text'
 
@@ -38,6 +53,46 @@ export class TauriFileSystem implements FileSystem {
     return { id: picked, name: basename(picked), label: picked }
   }
 
+  async openFile(): Promise<LooseFile | null> {
+    const picked = await open({
+      multiple: false,
+      filters: [{ name: 'Texto e Markdown', extensions: ['md', 'markdown', 'txt'] }],
+    })
+    if (typeof picked !== 'string') return null
+
+    await invoke('allow_base', { path: picked })
+    // The file is its own base: the root of that base is the file itself, so
+    // the empty path resolves straight to it.
+    this.roots.set(picked, picked)
+    return { baseId: picked, name: basename(picked), label: picked }
+  }
+
+  /**
+   * On the desktop the id of a base is its absolute path, so reopening one is
+   * a matter of asking the Rust side for access to that path again.
+   */
+  async restoreBase(baseId: string): Promise<Restored<Base>> {
+    try {
+      await invoke('allow_base', { path: baseId })
+      await readDir(baseId)
+    } catch {
+      return { status: 'gone' }
+    }
+    this.roots.set(baseId, baseId)
+    return { status: 'ok', value: { id: baseId, name: basename(baseId), label: baseId } }
+  }
+
+  async restoreFile(baseId: string): Promise<Restored<LooseFile>> {
+    try {
+      await invoke('allow_base', { path: baseId })
+      await stat(baseId)
+    } catch {
+      return { status: 'gone' }
+    }
+    this.roots.set(baseId, baseId)
+    return { status: 'ok', value: { baseId, name: basename(baseId), label: baseId } }
+  }
+
   async list(baseId: string, path: string): Promise<Entry[]> {
     const entries = await readDir(this.absolute(baseId, path))
     return entries
@@ -53,6 +108,61 @@ export class TauriFileSystem implements FileSystem {
         }
       })
       .sort(compareEntries)
+  }
+
+  readonly can: Capabilities = { trash: true, reveal: true, absolutePath: true }
+
+  async createFile(baseId: string, path: string): Promise<Entry> {
+    await writeTextFile(this.absolute(baseId, path), '')
+    return this.entry(baseId, path, 'file')
+  }
+
+  async createFolder(baseId: string, path: string): Promise<Entry> {
+    await mkdir(this.absolute(baseId, path), { recursive: true })
+    return this.entry(baseId, path, 'directory')
+  }
+
+  async move(baseId: string, from: string, to: string): Promise<Entry> {
+    const source = this.absolute(baseId, from)
+    await rename(source, this.absolute(baseId, to))
+    const info = await stat(this.absolute(baseId, to))
+    return this.entry(baseId, to, info.isDirectory ? 'directory' : 'file')
+  }
+
+  async duplicate(baseId: string, path: string): Promise<Entry> {
+    const parent = parentPath(path)
+    let name = copyName(baseName(path), 'copia')
+    for (let attempt = 2; await this.exists(baseId, joinPath(parent, name)); attempt++) {
+      name = copyName(baseName(path), 'copia ' + attempt)
+    }
+    const target = joinPath(parent, name)
+    await copyFile(this.absolute(baseId, path), this.absolute(baseId, target))
+    return this.entry(baseId, target, 'file')
+  }
+
+  async trash(baseId: string, path: string): Promise<void> {
+    await invoke('move_to_trash', { path: this.absolute(baseId, path) })
+  }
+
+  async reveal(baseId: string, path: string): Promise<void> {
+    await invoke('reveal_in_file_manager', { path: this.absolute(baseId, path) })
+  }
+
+  absolutePath(baseId: string, path: string): string {
+    return this.absolute(baseId, path)
+  }
+
+  private async exists(baseId: string, path: string): Promise<boolean> {
+    try {
+      await stat(this.absolute(baseId, path))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private entry(baseId: string, path: string, kind: 'file' | 'directory'): Entry {
+    return { id: entryId(baseId, path), baseId, path, name: baseName(path), kind }
   }
 
   async read(baseId: string, path: string): Promise<LoadedFile> {

@@ -67,6 +67,14 @@ export const FileIcon = (p: IconProps) => (
   </Icon>
 )
 
+export const FilePlusIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4" />
+    <path d="M14 3v5h5v3" />
+    <path d="M17 14.5v5M14.5 17h5" />
+  </Icon>
+)
+
 export const ChevronIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M9 5.5 15.5 12 9 18.5" />
@@ -142,5 +150,19 @@ export const GripIcon = (p: IconProps) => (
     <circle cx="15" cy="12" r="0.9" />
     <circle cx="9" cy="17" r="0.9" />
     <circle cx="15" cy="17" r="0.9" />
+  </Icon>
+)
+
+export const CollapseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 4.5h12M8 12h12M8 19.5h12" />
+    <path d="m5.5 7 -2 -2.5L1.5 7M5.5 17l-2 2.5L1.5 17" />
+  </Icon>
+)
+
+export const CrosshairIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
   </Icon>
 )

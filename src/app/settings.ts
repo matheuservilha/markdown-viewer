@@ -21,6 +21,8 @@ export interface Settings {
   bodyFont: BodyFont
   /** Scale of the interface around the editor, as a multiplier. */
   uiScale: number
+  /** Width of the file tree, in px. Dragged, not typed. */
+  sidebarWidth: number
   themeMode: ThemeMode
   readOnly: boolean
 }
@@ -31,6 +33,7 @@ export const DEFAULTS: Settings = {
   lineHeight: 1.7,
   bodyFont: 'sans',
   uiScale: 1.12,
+  sidebarWidth: 216,
   themeMode: 'system',
   readOnly: false,
 }
@@ -40,6 +43,7 @@ export const LIMITS = {
   fontSize: { min: 12, max: 22, step: 0.5 },
   lineHeight: { min: 1.3, max: 2.2, step: 0.05 },
   uiScale: { min: 0.9, max: 1.35, step: 0.05 },
+  sidebarWidth: { min: 170, max: 620, step: 1 },
 } as const
 
 const FONT_STACKS: Record<BodyFont, string> = {
@@ -72,6 +76,7 @@ function apply(settings: Settings): void {
   const root = document.documentElement.style
   root.setProperty('--measure', settings.measurePx + 'px')
   root.setProperty('--ui-scale', String(settings.uiScale))
+  root.setProperty('--sidebar-width', settings.sidebarWidth + 'px')
   root.setProperty('--font-size', settings.fontSize + 'px')
   root.setProperty('--line-height', String(settings.lineHeight))
   root.setProperty('--font-body', FONT_STACKS[settings.bodyFont])

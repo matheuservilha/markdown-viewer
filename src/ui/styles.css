@@ -227,30 +227,87 @@ a:focus-visible,
 
   /* The row has to be capped, or the grid grows to fit the document and the
      whole page scrolls instead of the editor. */
-  grid-template-columns: 13.5rem minmax(0, 1fr);
+  /* The middle track is the drag handle, so the gap between the panes is the
+     thing you grab. */
+  grid-template-columns: var(--sidebar-width, 13.5rem) 0.625rem minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 0.625rem;
   height: 100%;
   padding: 0.625rem;
   overflow: hidden;
   background: var(--bg-app);
-  transition: grid-template-columns var(--ease);
 }
 
+/*
+ * The sidebar opens and closes with no transition on purpose. Animating a grid
+ * track relays out the whole window on every frame, and the editor inside has
+ * to re-measure every visible line while that happens: the animation is itself
+ * what makes the interface feel slow.
+ */
 .shell.is-collapsed {
-  grid-template-columns: 0 minmax(0, 1fr);
-  gap: 0;
+  grid-template-columns: 0 0 minmax(0, 1fr);
+}
+
+/* The handle between the tree and the editor. */
+.resizer {
+  grid-column: 2;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  content: '';
+  transform: translateX(-50%);
+  transition: background-color var(--ease);
+}
+
+.resizer:hover::after,
+.resizer:focus-visible::after,
+.resizer.is-dragging::after {
+  background: var(--accent);
+}
+
+.resizer:focus-visible {
+  box-shadow: none;
 }
 
 /* -------------------------------------------------------------- sidebar */
 
 .sidebar {
+  grid-column: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-sidebar);
+}
+
+/*
+ * On the desktop the window has no title bar, so the system's close, minimise
+ * and zoom buttons float over the top left corner. The sidebar starts below
+ * them, and the brand row doubles as the area to drag the window by.
+ */
+:root[data-desktop='true'] .shell {
+  padding-top: 1.9rem;
+}
+
+:root[data-desktop='true'] .brand,
+:root[data-desktop='true'] .topbar {
+  app-region: drag;
+}
+
+:root[data-desktop='true'] .brand button,
+:root[data-desktop='true'] .topbar button,
+:root[data-desktop='true'] .topbar a {
+  app-region: no-drag;
 }
 
 .brand {
@@ -298,6 +355,12 @@ a:focus-visible,
 }
 
 /* Full-width sidebar action, in the shape of a navigation row. */
+.nav-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .nav-action {
   display: flex;
   gap: 0.625rem;
@@ -323,6 +386,36 @@ a:focus-visible,
   border-color: var(--border-emphasis);
   background: var(--surface-hover);
   color: var(--text-primary);
+}
+
+/* The one case where the browser has to be explained to the person. */
+.nav-notice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  margin-top: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.nav-notice:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.nav-notice-hint {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
 }
 
 .search {
@@ -372,6 +465,45 @@ a:focus-visible,
   overscroll-behavior: contain;
 }
 
+.section-head {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+
+  /* Not a fixed height: a long folder name used to wrap inside it and spill
+     over the first rows of the tree. */
+  min-height: 1.5rem;
+  padding-right: 0.125rem;
+}
+
+.section-head .section-label {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.section-spacer {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+.section-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.0625rem;
+  opacity: 0;
+  transition: opacity var(--ease);
+}
+
+.tree-section:hover .section-actions,
+.section-actions:focus-within {
+  opacity: 1;
+}
+
+.icon-button.is-small {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
 .section-label {
   display: block;
   padding: 0 0.25rem;
@@ -381,6 +513,10 @@ a:focus-visible,
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+
+  /* Shown whole and on one line. When it does not fit, the tree scrolls
+     sideways and the sidebar can be dragged wider. */
+  white-space: nowrap;
 }
 
 .tree-section + .tree-section {
@@ -463,6 +599,24 @@ a:focus-visible,
 .tree-row.is-active .tree-icon.is-folder,
 .tree-icon.is-folder {
   color: var(--tone-blue);
+}
+
+.tree-row.is-renaming {
+  background: var(--surface-2);
+  cursor: text;
+}
+
+.tree-rename {
+  flex: 1;
+  min-width: 0;
+  padding: 0.0625rem 0.25rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+  background: var(--bg-content);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.78125rem;
+  outline: none;
 }
 
 .tree-name {
@@ -562,6 +716,7 @@ a:focus-visible,
 /* ------------------------------------------------------------ workspace */
 
 .workspace {
+  grid-column: 3;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -796,7 +951,6 @@ a:focus-visible,
 .empty-action {
   height: 2rem;
   padding: 0 0.875rem;
-  margin-top: 0.3125rem;
   border: 0;
   border-radius: var(--radius-md);
   background: var(--accent);
@@ -810,6 +964,24 @@ a:focus-visible,
 
 .empty-action:hover {
   background: var(--accent-hover);
+}
+
+.empty-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.3125rem;
+}
+
+.empty-action.is-quiet {
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.empty-action.is-quiet:hover {
+  border-color: var(--border-emphasis);
+  background: var(--surface-2);
+  color: var(--text-primary);
 }
 
 /* ----------------------------------------------------------- status bar */
@@ -892,6 +1064,67 @@ a:focus-visible,
   line-height: 1.45;
 }
 
+/* --------------------------------------------------- context menu */
+
+.menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 11rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow:
+    0 0.75rem 2rem rgb(0 0 0 / 28%),
+    0 2px 8px rgb(0 0 0 / 18%);
+}
+
+.menu-item {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: default;
+  transition:
+    background-color var(--ease),
+    color var(--ease);
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.menu-item:disabled {
+  color: var(--text-disabled);
+}
+
+.menu-item.is-separated {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0;
+}
+
+.menu-item.is-destructive {
+  color: var(--tone-red);
+}
+
+.menu-hint {
+  color: var(--text-disabled);
+  font-family: inherit;
+  font-size: 0.6875rem;
+}
+
 /* ------------------------------------------------- settings window */
 
 /*
@@ -911,11 +1144,17 @@ a:focus-visible,
   max-height: calc(100vh - 4rem);
   border: 1px solid var(--border-emphasis);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
   box-shadow:
     0 14px 38px rgb(0 0 0 / 30%),
     0 2px 8px rgb(0 0 0 / 20%);
-  backdrop-filter: blur(18px) saturate(150%);
+
+  /*
+   * The surface is opaque and there is no backdrop blur. A translucent panel
+   * has to be re-blurred on every frame in which anything underneath it moves,
+   * so leaving this window open while scrolling a note would cost a full-screen
+   * readback per frame.
+   */
+  background: var(--surface-2);
 }
 
 .settings-head {
@@ -1170,12 +1409,6 @@ a:focus-visible,
 }
 
 /* --------------------------------------------------------- responsive */
-
-@media (width <= 820px) {
-  .shell {
-    grid-template-columns: 11.25rem minmax(0, 1fr);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   * {

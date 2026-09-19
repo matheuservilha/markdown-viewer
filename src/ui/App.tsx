@@ -1,18 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { loadSession, saveSession, type Session, type ViewState } from '~/app/session'
 import { useSettings } from '~/app/settings'
 import { useWorkspace } from '~/app/store'
-import { entryId } from '~/platform/fs'
+import { entryId, parentPath, type Entry } from '~/platform/fs'
+import { fileSystem, platform } from '~/platform'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
-import { FileTree } from './FileTree'
+import { ContextMenu, type MenuItem } from './ContextMenu'
+import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { MeasureGuides } from './MeasureGuides'
 import { SettingsWindow } from './SettingsWindow'
+import { SidebarResizer } from './SidebarResizer'
 import { StatusBar } from './StatusBar'
 import { Tabs } from './Tabs'
 import {
+  AlertIcon,
   BrandMark,
+  CollapseIcon,
+  CrosshairIcon,
   EyeIcon,
+  FilePlusIcon,
   FolderPlusIcon,
   MoonIcon,
   SearchIcon,
@@ -33,9 +41,197 @@ export function App() {
   const [showAllFiles, setShowAllFiles] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [measuring, setMeasuring] = useState(false)
+  const [menu, setMenu] = useState<{ entry: Entry; x: number; y: number } | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+
+  // Only the four slices the tree reads, so that typing in a document does not
+  // invalidate it.
+  const treeData: TreeData = useMemo(
+    () => ({
+      children: state.children,
+      expanded: state.expanded,
+      activeId: state.activeId,
+      filter: state.filter,
+    }),
+    [state.children, state.expanded, state.activeId, state.filter],
+  )
+
+  /**
+   * Cursor and scroll per file. It is a reference and not state because nothing
+   * on screen depends on it: it exists only to be written into the session.
+   */
+  const views = useRef<Record<string, ViewState>>({})
+
+  const toggleFolder = useCallback((entry: Entry) => void actions.toggleFolder(entry), [actions])
+  const openFile = useCallback(
+    (entry: Entry, preview: boolean) => void actions.openFile(entry, preview),
+    [actions],
+  )
+
+  /**
+   * Creating something drops it straight into rename mode, because the name a
+   * file is born with is never the one it should keep.
+   */
+  const createIn = useCallback(
+    async (baseId: string, parent: string, kind: 'file' | 'folder') => {
+      await actions.expandFolder(baseId, parent)
+      const entry = await actions.createEntry(baseId, parent, kind)
+      if (!entry) return
+      if (kind === 'file') void actions.openFile(entry, false)
+      setRenamingId(entry.id)
+    },
+    [actions],
+  )
+
+  const tree: TreeHandlers = useMemo(
+    () => ({
+      onToggleFolder: toggleFolder,
+      onOpenFile: openFile,
+      onContextMenu: (entry, x, y) => setMenu({ entry, x, y }),
+      onStartRename: (entry) => setRenamingId(entry.id),
+      onRename: (entry, name) => {
+        setRenamingId(null)
+        void actions.renameEntry(entry, name)
+      },
+      onCancelRename: () => setRenamingId(null),
+      onTrash: (entry) => void actions.trashEntry(entry),
+    }),
+    [actions, openFile, toggleFolder],
+  )
+
+  const menuItems = useCallback(
+    (entry: Entry): MenuItem[] => {
+      const files = fileSystem()
+      const parent = entry.kind === 'directory' ? entry.path : parentPath(entry.path)
+      const copy = (text: string) => void navigator.clipboard.writeText(text)
+
+      return [
+        { label: 'Novo arquivo', onSelect: () => void createIn(entry.baseId, parent, 'file') },
+        { label: 'Nova pasta', onSelect: () => void createIn(entry.baseId, parent, 'folder') },
+        {
+          label: 'Renomear',
+          hint: 'F2',
+          separated: true,
+          onSelect: () => setRenamingId(entry.id),
+        },
+        {
+          label: 'Duplicar',
+          disabled: entry.kind === 'directory',
+          onSelect: () => void actions.duplicateEntry(entry),
+        },
+        {
+          label: 'Copiar caminho',
+          separated: true,
+          disabled: !files.can.absolutePath,
+          onSelect: () => copy(files.absolutePath(entry.baseId, entry.path) ?? entry.path),
+        },
+        { label: 'Copiar caminho relativo', onSelect: () => copy(entry.path) },
+        ...(files.can.reveal
+          ? [
+              {
+                label: 'Revelar no Finder',
+                onSelect: () => void actions.revealEntry(entry),
+              },
+            ]
+          : []),
+        {
+          label: 'Mover para a lixeira',
+          hint: '⌘⌫',
+          separated: true,
+          destructive: true,
+          disabled: !files.can.trash,
+          onSelect: () => void actions.trashEntry(entry),
+        },
+      ]
+    },
+    [actions, createIn],
+  )
+
+  /** Opens every folder down to the file that is on screen, and scrolls to it. */
+  const revealActive = useCallback(async () => {
+    const tab = latestTab.current
+    if (!tab) return
+    await actions.revealPath(tab.baseId, tab.path)
+    requestAnimationFrame(() => {
+      document
+        .querySelector('.tree-row.is-active')
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  }, [actions])
 
   const activeTab = state.tabs.find((tab) => tab.id === state.activeId) ?? null
   const activeDoc = state.activeId ? (state.docs[state.activeId] ?? null) : null
+  const latestTab = useRef(activeTab)
+  latestTab.current = activeTab
+
+  // Reopen last session once, before anything else touches the workspace.
+  const previous = useRef<Session | null>(null)
+  const restoreRef = useRef(actions.restoreSession)
+  restoreRef.current = actions.restoreSession
+  const restoreStarted = useRef(false)
+  useEffect(() => {
+    // Development runs effects twice, and reopening a session is not something
+    // to do twice.
+    if (restoreStarted.current) return
+    restoreStarted.current = true
+
+    const session = loadSession()
+    if (!session) return
+    previous.current = session
+    setSidebarOpen(session.sidebarOpen)
+    views.current = Object.fromEntries(
+      session.tabs.flatMap((tab) => (tab.view ? [[tab.id, tab.view]] : [])),
+    )
+    void restoreRef.current(session, false)
+  }, [])
+
+  /**
+   * Whatever could not be reopened is carried over untouched. Without this, a
+   * folder waiting for the person to grant permission again would be erased
+   * from the session by the first save, and the offer to reopen it would have
+   * nothing left to reopen.
+   */
+  const persist = useCallback(() => {
+    const kept = previous.current
+    const waiting = new Set(state.pending)
+    const heldTabs = kept ? kept.tabs.filter((tab) => waiting.has(tab.baseId)) : []
+    const heldBases = kept ? kept.bases.filter((id) => waiting.has(id)) : []
+    const heldFiles = kept ? kept.files.filter((id) => waiting.has(id)) : []
+    const heldFolders = kept
+      ? kept.expanded.filter((id) => waiting.has(id.slice(0, id.indexOf(':'))))
+      : []
+
+    saveSession({
+      version: 1,
+      bases: [...heldBases, ...state.bases.map((base) => base.id)],
+      files: [
+        ...heldFiles,
+        ...state.tabs.filter((tab) => tab.label !== undefined).map((tab) => tab.baseId),
+      ],
+      expanded: [...heldFolders, ...Object.keys(state.expanded).filter((id) => state.expanded[id])],
+      tabs: [
+        ...heldTabs,
+        ...state.tabs.map((tab) => ({
+          id: tab.id,
+          baseId: tab.baseId,
+          path: tab.path,
+          name: tab.name,
+          preview: tab.preview,
+          ...(tab.label === undefined ? {} : { label: tab.label }),
+          ...(views.current[tab.id] ? { view: views.current[tab.id] } : {}),
+        })),
+      ],
+      activeId: state.activeId ?? kept?.activeId ?? null,
+      sidebarOpen,
+    })
+  }, [state.bases, state.tabs, state.expanded, state.activeId, state.pending, sidebarOpen])
+
+  // Writing the session costs a few hundred bytes of ids and paths, so it is
+  // written on every change rather than on the way out.
+  useEffect(() => {
+    if (!state.restored && state.bases.length === 0 && state.tabs.length === 0) return
+    persist()
+  }, [persist, state.restored, state.bases.length, state.tabs.length])
 
   const saveActive = useCallback(() => {
     if (state.activeId) void actions.save(state.activeId)
@@ -87,7 +283,7 @@ export function App() {
   return (
     <div className={'shell' + (sidebarOpen ? '' : ' is-collapsed')}>
       <aside className="sidebar">
-        <div className="brand">
+        <div className="brand" data-tauri-drag-region>
           <BrandMark />
           <span className="brand-name">markdown-viewer</span>
           <button
@@ -101,10 +297,20 @@ export function App() {
           </button>
         </div>
 
-        <button type="button" className="nav-action" onClick={() => void actions.openBase()}>
-          <FolderPlusIcon />
-          Abrir pasta
-        </button>
+        <div className="nav-actions">
+          <button type="button" className="nav-action" onClick={() => void actions.openBase()}>
+            <FolderPlusIcon />
+            Abrir pasta
+          </button>
+          <button
+            type="button"
+            className="nav-action"
+            onClick={() => void actions.openLooseFile()}
+          >
+            <FilePlusIcon />
+            Abrir arquivo
+          </button>
+        </div>
 
         {state.bases.length > 0 && (
           <div className="search">
@@ -119,19 +325,81 @@ export function App() {
           </div>
         )}
 
+        {state.pending.length > 0 && (
+          <button
+            type="button"
+            className="nav-notice"
+            onClick={() => {
+              const session = loadSession()
+              if (session) void actions.restoreSession(session, true)
+            }}
+          >
+            <AlertIcon size={15} />
+            <span>
+              Reabrir a sessão anterior
+              <span className="nav-notice-hint">
+                {state.pending.length === 1
+                  ? 'o navegador precisa da sua permissão de novo'
+                  : state.pending.length + ' pastas precisam da sua permissão de novo'}
+              </span>
+            </span>
+          </button>
+        )}
+
         <nav className="tree-scroll" role="tree" aria-label="Arquivos">
           {state.bases.map((base) => (
             <section className="tree-section" key={base.id}>
-              <h2 className="section-label" title={base.label}>
-                {base.name}
-              </h2>
+              <div className="section-head">
+                <h2 className="section-label" title={base.label}>
+                  {base.name}
+                </h2>
+                <span className="section-spacer" />
+                <div className="section-actions">
+                  <button
+                    type="button"
+                    className="icon-button is-small"
+                    aria-label="Novo arquivo"
+                    title="Novo arquivo"
+                    onClick={() => void createIn(base.id, '', 'file')}
+                  >
+                    <FilePlusIcon size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button is-small"
+                    aria-label="Nova pasta"
+                    title="Nova pasta"
+                    onClick={() => void createIn(base.id, '', 'folder')}
+                  >
+                    <FolderPlusIcon size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button is-small"
+                    aria-label="Revelar o arquivo aberto"
+                    title="Revelar o arquivo aberto"
+                    onClick={() => void revealActive()}
+                  >
+                    <CrosshairIcon size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button is-small"
+                    aria-label="Recolher tudo"
+                    title="Recolher tudo"
+                    onClick={actions.collapseAll}
+                  >
+                    <CollapseIcon size={15} />
+                  </button>
+                </div>
+              </div>
               <FileTree
-                state={state}
+                data={treeData}
                 parentId={entryId(base.id, '')}
                 depth={0}
                 showAllFiles={showAllFiles}
-                onToggleFolder={(entry) => void actions.toggleFolder(entry)}
-                onOpenFile={(entry, preview) => void actions.openFile(entry, preview)}
+                renamingId={renamingId}
+                {...tree}
               />
             </section>
           ))}
@@ -173,6 +441,13 @@ export function App() {
         </div>
       </aside>
 
+      {sidebarOpen && (
+        <SidebarResizer
+          width={settings.sidebarWidth}
+          onCommit={(width) => update('sidebarWidth', width)}
+        />
+      )}
+
       <main className="workspace">
         <Tabs
           state={state}
@@ -184,7 +459,7 @@ export function App() {
         {/* The bar stays up whenever there is something for it to carry, which
             includes the only way back from a collapsed sidebar. */}
         {(activeTab || !sidebarOpen) && (
-          <header className="topbar">
+          <header className="topbar" data-tauri-drag-region>
             {!sidebarOpen && (
               <button
                 type="button"
@@ -220,12 +495,21 @@ export function App() {
               tab={activeTab}
               doc={activeDoc}
               readOnly={activeDoc.shape.lossy || settings.readOnly}
+              initialView={views.current[activeTab.id]}
+              onViewChange={(view) => {
+                views.current = { ...views.current, [activeTab.id]: view }
+                persist()
+              }}
               onChange={(text) => actions.edit(activeTab.id, text)}
               onSave={saveActive}
             />
           </>
         ) : (
-          <EmptyState hasBase={state.bases.length > 0} onOpenBase={() => void actions.openBase()} />
+          <EmptyState
+            hasBase={state.bases.length > 0}
+            onOpenBase={() => void actions.openBase()}
+            onOpenFile={() => void actions.openLooseFile()}
+          />
         )}
 
         <StatusBar
@@ -235,6 +519,15 @@ export function App() {
           onReload={() => state.activeId && void actions.reload(state.activeId)}
         />
       </main>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={menuItems(menu.entry)}
+          onClose={() => setMenu(null)}
+        />
+      )}
 
       {settingsOpen && (
         <SettingsWindow
@@ -263,9 +556,10 @@ export function App() {
 interface EmptyStateProps {
   hasBase: boolean
   onOpenBase: () => void
+  onOpenFile: () => void
 }
 
-function EmptyState({ hasBase, onOpenBase }: EmptyStateProps) {
+function EmptyState({ hasBase, onOpenBase, onOpenFile }: EmptyStateProps) {
   return (
     <div className="empty">
       <div className="empty-card">
@@ -273,14 +567,19 @@ function EmptyState({ hasBase, onOpenBase }: EmptyStateProps) {
         <p className="empty-hint">
           {hasBase
             ? 'Um clique abre em prévia, dois cliques fixam a aba.'
-            : 'Abra uma pasta para começar. Nada é copiado, os arquivos ficam onde estão.'}
+            : 'Abra uma pasta, ou um arquivo de qualquer lugar do disco. Nada é copiado, os arquivos ficam onde estão.'}
         </p>
         {!hasBase && (
-          <button type="button" className="empty-action" onClick={onOpenBase}>
-            Abrir pasta
-          </button>
+          <div className="empty-actions">
+            <button type="button" className="empty-action" onClick={onOpenBase}>
+              Abrir pasta
+            </button>
+            <button type="button" className="empty-action is-quiet" onClick={onOpenFile}>
+              Abrir arquivo
+            </button>
+          </div>
         )}
-        {!hasBase && !supportsDirectoryPicker() && (
+        {!hasBase && platform() === 'browser' && !supportsDirectoryPicker() && (
           <p className="empty-warn">
             Este navegador não abre uma pasta inteira. Use um navegador Chromium ou o app de
             desktop.

@@ -149,8 +149,12 @@ function label(text: string): HTMLElement {
   return span
 }
 
-function compute(state: EditorState): DecorationSet {
-  const matter = findFrontmatter(state)
+interface MatterState {
+  matter: FrontmatterRange | null
+  decorations: DecorationSet
+}
+
+function draw(state: EditorState, matter: FrontmatterRange | null): DecorationSet {
   if (!matter || touches(state, matter.from, matter.to)) return Decoration.none
   return Decoration.set([
     Decoration.replace({
@@ -163,13 +167,25 @@ function compute(state: EditorState): DecorationSet {
   ])
 }
 
+function compute(state: EditorState): MatterState {
+  const matter = findFrontmatter(state)
+  return { matter, decorations: draw(state, matter) }
+}
+
 /**
  * Block decorations have to come from a state field: a view plugin is built
  * after the view has already measured its lines, so CodeMirror ignores block
  * decorations handed to it from there.
+ *
+ * Only a change to the text can move the block, so a cursor move never pays for
+ * the scan.
  */
-export const frontmatterBlock = StateField.define<DecorationSet>({
+export const frontmatterBlock = StateField.define<MatterState>({
   create: compute,
-  update: (value, tr) => (tr.docChanged || tr.selection ? compute(tr.state) : value),
-  provide: (field) => EditorView.decorations.from(field),
+  update: (value, tr) => {
+    if (tr.docChanged) return compute(tr.state)
+    if (!tr.selection || !value.matter) return value
+    return { matter: value.matter, decorations: draw(tr.state, value.matter) }
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 })

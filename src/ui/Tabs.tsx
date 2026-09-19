@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { State } from '~/app/store'
 import { CloseIcon } from './icons'
 
@@ -8,7 +9,7 @@ interface Props {
   onClose: (id: string) => void
 }
 
-export function Tabs({ state, onActivate, onPin, onClose }: Props) {
+export const Tabs = memo(function Tabs({ state, onActivate, onPin, onClose }: Props) {
   if (state.tabs.length === 0) return null
 
   return (
@@ -27,7 +28,7 @@ export function Tabs({ state, onActivate, onPin, onClose }: Props) {
               (tab.preview ? ' is-preview' : '') +
               (dirty ? ' is-dirty' : '')
             }
-            title={tab.path}
+            title={tab.label ?? tab.path}
             onClick={() => onActivate(tab.id)}
             onDoubleClick={() => onPin(tab.id)}
             onKeyDown={(event) => {
@@ -54,4 +55,4 @@ export function Tabs({ state, onActivate, onPin, onClose }: Props) {
       })}
     </div>
   )
-}
+})

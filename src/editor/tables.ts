@@ -146,33 +146,78 @@ class TableWidget extends WidgetType {
   }
 }
 
-function compute(state: EditorState): DecorationSet {
+/**
+ * Block containers a table can be found inside. Everything else is a leaf as far
+ * as this search is concerned, and is not descended into: without this the walk
+ * visits every inline node of the whole document on every keystroke and on every
+ * step of a mouse selection.
+ */
+const CONTAINERS = new Set([
+  'Document',
+  'Blockquote',
+  'BulletList',
+  'OrderedList',
+  'ListItem',
+])
+
+interface Span {
+  from: number
+  to: number
+}
+
+function findTables(state: EditorState): Span[] {
+  const found: Span[] = []
+  syntaxTree(state).iterate({
+    enter: (node) => {
+      if (node.name === 'Table') {
+        found.push({ from: node.from, to: node.to })
+        return false
+      }
+      return CONTAINERS.has(node.name) ? undefined : false
+    },
+  })
+  return found
+}
+
+function draw(state: EditorState, tables: Span[]): DecorationSet {
+  if (tables.length === 0) return Decoration.none
   const spans = activeLines(state)
   const decorations: Range<Decoration>[] = []
 
-  syntaxTree(state).iterate({
-    enter: (node) => {
-      if (node.name !== 'Table') return
-      if (overlaps(spans, node.from, node.to)) return false
-      decorations.push(
-        Decoration.replace({
-          block: true,
-          widget: new TableWidget(
-            state.doc.sliceString(node.from, node.to),
-            node.from,
-            node.to,
-          ),
-        }).range(node.from, node.to),
-      )
-      return false
-    },
-  })
+  for (const table of tables) {
+    if (overlaps(spans, table.from, table.to)) continue
+    decorations.push(
+      Decoration.replace({
+        block: true,
+        widget: new TableWidget(
+          state.doc.sliceString(table.from, table.to),
+          table.from,
+          table.to,
+        ),
+      }).range(table.from, table.to),
+    )
+  }
 
   return Decoration.set(decorations, true)
 }
 
-export const tableBlocks = StateField.define<DecorationSet>({
+interface TableState {
+  tables: Span[]
+  decorations: DecorationSet
+}
+
+function compute(state: EditorState): TableState {
+  const tables = findTables(state)
+  return { tables, decorations: draw(state, tables) }
+}
+
+export const tableBlocks = StateField.define<TableState>({
   create: compute,
-  update: (value, tr) => (tr.docChanged || tr.selection ? compute(tr.state) : value),
-  provide: (field) => EditorView.decorations.from(field),
+  update: (value, tr) => {
+    // Where the tables are can only change when the text does.
+    if (tr.docChanged) return compute(tr.state)
+    if (!tr.selection || value.tables.length === 0) return value
+    return { tables: value.tables, decorations: draw(tr.state, value.tables) }
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
 })
