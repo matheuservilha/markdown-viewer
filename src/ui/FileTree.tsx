@@ -1,6 +1,6 @@
 import { isPlainText, isTextFile, type Entry } from '~/platform/fs'
 import type { State } from '~/app/store'
-import { FileIcon, FolderIcon, MarkdownIcon } from './icons'
+import { ChevronIcon, FileIcon, FolderIcon, MarkdownIcon } from './icons'
 
 interface Props {
   state: State
@@ -21,10 +21,10 @@ function matchesFilter(state: State, entry: Entry, filter: string): boolean {
 
 /** Folder, Markdown file, plain text and everything else each get their own mark. */
 function EntryIcon({ entry }: { entry: Entry }) {
-  if (entry.kind === 'directory') return <FolderIcon className="tree-icon is-folder" />
-  if (isPlainText(entry.name)) return <FileIcon className="tree-icon is-text" />
-  if (isTextFile(entry.name)) return <MarkdownIcon className="tree-icon is-markdown" />
-  return <FileIcon className="tree-icon is-other" />
+  if (entry.kind === 'directory') return <FolderIcon size={15} className="tree-icon is-folder" />
+  if (isPlainText(entry.name)) return <FileIcon size={15} className="tree-icon is-text" />
+  if (isTextFile(entry.name)) return <MarkdownIcon size={15} className="tree-icon is-markdown" />
+  return <FileIcon size={15} className="tree-icon is-other" />
 }
 
 export function FileTree({
@@ -42,43 +42,40 @@ export function FileTree({
   })
 
   return (
-    <ul className="tree" role="group">
+    <ul className={'tree' + (depth > 0 ? ' is-nested' : '')} role="group">
       {entries.map((entry) => {
         const open = state.expanded[entry.id] === true
         const readable = entry.kind === 'directory' || isTextFile(entry.name)
+        const openEntry = (preview: boolean) => {
+          if (entry.kind === 'directory') onToggleFolder(entry)
+          else if (readable) onOpenFile(entry, preview)
+        }
+
         return (
           <li key={entry.id}>
-            <div
+            <button
+              type="button"
               className={
                 'tree-row' +
                 (state.activeId === entry.id ? ' is-active' : '') +
-                (entry.kind === 'directory' ? ' is-folder' : '') +
                 (readable ? '' : ' is-muted')
               }
-              style={{ paddingLeft: depth * 14 + 8 + 'px' }}
               role="treeitem"
               aria-expanded={entry.kind === 'directory' ? open : undefined}
-              tabIndex={0}
-              onClick={() => {
-                if (entry.kind === 'directory') onToggleFolder(entry)
-                else if (readable) onOpenFile(entry, true)
-              }}
-              onDoubleClick={() => {
-                if (entry.kind === 'file' && readable) onOpenFile(entry, false)
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return
-                event.preventDefault()
-                if (entry.kind === 'directory') onToggleFolder(entry)
-                else if (readable) onOpenFile(entry, false)
-              }}
+              title={entry.name}
+              onClick={() => openEntry(true)}
+              onDoubleClick={() => entry.kind === 'file' && openEntry(false)}
             >
-              <span className="tree-twisty" aria-hidden="true">
-                {entry.kind === 'directory' ? (open ? '▾' : '▸') : ''}
-              </span>
+              <ChevronIcon
+                size={12}
+                className={
+                  'tree-twisty' +
+                  (entry.kind === 'directory' ? (open ? ' is-open' : '') : ' is-leaf')
+                }
+              />
               <EntryIcon entry={entry} />
               <span className="tree-name">{entry.name}</span>
-            </div>
+            </button>
             {entry.kind === 'directory' && open && (
               <FileTree
                 state={state}

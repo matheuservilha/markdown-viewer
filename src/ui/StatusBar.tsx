@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { Doc, Tab } from '~/app/store'
+import { AlertIcon } from './icons'
 
 /** 200 words a minute, the figure Bear and iA Writer both use. */
 const WORDS_PER_MINUTE = 200
@@ -28,7 +29,7 @@ export function StatusBar({ tab, doc, onReload, onSave }: Props) {
     <footer className="status">
       {doc.conflict && (
         <span className="status-conflict">
-          O arquivo mudou fora do editor.
+          <AlertIcon size={13} />O arquivo mudou fora do editor.
           <button type="button" onClick={onSave}>
             Manter o meu
           </button>
@@ -39,7 +40,12 @@ export function StatusBar({ tab, doc, onReload, onSave }: Props) {
       )}
       <span className="status-path">{tab.path}</span>
       <span className="status-spacer" />
-      {doc.shape.lossy && <span className="status-warn">não é UTF-8, somente leitura</span>}
+      {doc.shape.lossy && (
+        <span className="status-warn">
+          <AlertIcon size={13} />
+          não é UTF-8, somente leitura
+        </span>
+      )}
       <span>{doc.shape.eol === '\r\n' ? 'CRLF' : 'LF'}</span>
       <span>{doc.shape.encoding.toUpperCase()}</span>
       <span>{counts.words} palavras</span>

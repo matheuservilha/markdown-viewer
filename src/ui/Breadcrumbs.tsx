@@ -7,12 +7,12 @@ interface Props {
 }
 
 /**
- * The trail of folders above the editor. The file name is not repeated here: it
- * is the title at the top of the page.
+ * The folder trail above the editor, ending in the open file. The title at the
+ * top of the page scrolls away; this line does not.
  */
 export function Breadcrumbs({ tab, base }: Props) {
   const segments = tab.path.split('/')
-  segments.pop()
+  const name = segments.pop() ?? tab.name
   const folders = base ? [base.name, ...segments] : segments
 
   return (
@@ -21,12 +21,20 @@ export function Breadcrumbs({ tab, base }: Props) {
         <span key={index} className="crumb">
           {index > 0 && (
             <span className="crumb-sep" aria-hidden="true">
-              ›
+              /
             </span>
           )}
           {folder}
         </span>
       ))}
+      <span className="crumb is-current">
+        {folders.length > 0 && (
+          <span className="crumb-sep" aria-hidden="true">
+            /
+          </span>
+        )}
+        {name}
+      </span>
     </nav>
   )
 }

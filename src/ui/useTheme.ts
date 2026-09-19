@@ -1,24 +1,29 @@
 import { useEffect, useState } from 'react'
+import type { ThemeMode } from '~/app/settings'
 
 export type Theme = 'light' | 'dark'
 
-const STORAGE_KEY = 'markdown-viewer.theme'
+const QUERY = '(prefers-color-scheme: dark)'
 
-function systemTheme(): Theme {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
+/**
+ * Resolves the chosen mode against the system. Following the system means
+ * following it live, so a machine that switches at sunset switches the app too.
+ */
+export function useResolvedTheme(mode: ThemeMode): Theme {
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia(QUERY).matches)
 
-/** Follows the system until the person picks a side, then remembers the pick. */
-export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    return stored === 'light' || stored === 'dark' ? stored : systemTheme()
-  })
+  useEffect(() => {
+    const media = window.matchMedia(QUERY)
+    const onChange = (event: MediaQueryListEvent) => setSystemDark(event.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  const theme: Theme = mode === 'system' ? (systemDark ? 'dark' : 'light') : mode
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    localStorage.setItem(STORAGE_KEY, theme)
   }, [theme])
 
-  return { theme, setTheme }
+  return theme
 }

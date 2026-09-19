@@ -2,17 +2,18 @@ import { EditorSelection, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { bodyStart } from '~/editor/frontmatter'
-import { editorExtensions } from '~/editor/setup'
+import { editorExtensions, readOnlyCompartment, readOnlyExtension } from '~/editor/setup'
 import { isPlainTextTab, type Doc, type Tab } from '~/app/store'
 
 interface Props {
   tab: Tab
   doc: Doc
+  readOnly: boolean
   onChange: (text: string) => void
   onSave: () => void
 }
 
-export function EditorPane({ tab, doc, onChange, onSave }: Props) {
+export function EditorPane({ tab, doc, readOnly, onChange, onSave }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   /** Cursor and history per tab, so switching back lands where you left. */
@@ -28,7 +29,7 @@ export function EditorPane({ tab, doc, onChange, onSave }: Props) {
       ...editorExtensions({
         title: tab.name,
         plainText: isPlainTextTab(tab),
-        readOnly: doc.shape.lossy,
+        readOnly,
         onSave: () => handlers.current.onSave(),
       }),
       EditorView.updateListener.of((update) => {
@@ -62,6 +63,13 @@ export function EditorPane({ tab, doc, onChange, onSave }: Props) {
     // CodeMirror itself, and pushing `doc.text` back in would fight the cursor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.id])
+
+  /** Read-only is swapped in place, so toggling it does not rebuild the editor. */
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: readOnlyCompartment.reconfigure(readOnlyExtension(readOnly)),
+    })
+  }, [readOnly])
 
   /** A reload from disk is the one case where the text is replaced from outside. */
   useEffect(() => {

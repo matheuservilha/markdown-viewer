@@ -1,22 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSettings } from '~/app/settings'
 import { useWorkspace } from '~/app/store'
 import { entryId } from '~/platform/fs'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
 import { FileTree } from './FileTree'
+import { MeasureGuides } from './MeasureGuides'
+import { SettingsWindow } from './SettingsWindow'
 import { StatusBar } from './StatusBar'
 import { Tabs } from './Tabs'
-import { useTheme } from './useTheme'
+import {
+  BrandMark,
+  EyeIcon,
+  FolderPlusIcon,
+  MoonIcon,
+  SearchIcon,
+  SettingsIcon,
+  SidebarIcon,
+  SunIcon,
+} from './icons'
+import { useResolvedTheme } from './useTheme'
 
 /** How long the typing has to stop before the file is written. */
 const AUTOSAVE_DELAY = 1500
 
 export function App() {
   const { state, actions } = useWorkspace()
-  const { theme, setTheme } = useTheme()
+  const { settings, update, reset } = useSettings()
+  const theme = useResolvedTheme(settings.themeMode)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [showAllFiles, setShowAllFiles] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [measuring, setMeasuring] = useState(false)
 
   const activeTab = state.tabs.find((tab) => tab.id === state.activeId) ?? null
   const activeDoc = state.activeId ? (state.docs[state.activeId] ?? null) : null
@@ -57,42 +73,58 @@ export function App() {
         event.preventDefault()
         actions.closeTab(state.activeId)
       }
+      if (event.key === ',') {
+        event.preventDefault()
+        setSettingsOpen((open) => !open)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [actions, state.activeId])
 
+  const dark = theme === 'dark'
+
   return (
     <div className={'shell' + (sidebarOpen ? '' : ' is-collapsed')}>
       <aside className="sidebar">
-        <div className="sidebar-head">
-          <button type="button" className="button" onClick={() => void actions.openBase()}>
-            Abrir pasta
-          </button>
+        <div className="brand">
+          <BrandMark />
+          <span className="brand-name">markdown-viewer</span>
           <button
             type="button"
-            className="button is-quiet"
-            aria-label="Alternar tema"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="icon-button"
+            aria-label="Esconder a barra lateral"
+            title="Esconder a barra lateral"
+            onClick={() => setSidebarOpen(false)}
           >
-            {theme === 'dark' ? '☾' : '☀'}
+            <SidebarIcon />
           </button>
         </div>
 
+        <button type="button" className="nav-action" onClick={() => void actions.openBase()}>
+          <FolderPlusIcon />
+          Abrir pasta
+        </button>
+
         {state.bases.length > 0 && (
-          <input
-            className="filter"
-            type="search"
-            placeholder="Filtrar arquivos"
-            value={state.filter}
-            onChange={(event) => actions.setFilter(event.target.value)}
-          />
+          <div className="search">
+            <SearchIcon size={15} className="search-icon" />
+            <input
+              className="search-input"
+              type="search"
+              placeholder="Filtrar arquivos"
+              value={state.filter}
+              onChange={(event) => actions.setFilter(event.target.value)}
+            />
+          </div>
         )}
 
         <nav className="tree-scroll" role="tree" aria-label="Arquivos">
           {state.bases.map((base) => (
-            <section key={base.id}>
-              <h2 className="base-name">{base.name}</h2>
+            <section className="tree-section" key={base.id}>
+              <h2 className="section-label" title={base.label}>
+                {base.name}
+              </h2>
               <FileTree
                 state={state}
                 parentId={entryId(base.id, '')}
@@ -105,19 +137,43 @@ export function App() {
           ))}
         </nav>
 
-        {state.bases.length > 0 && (
-          <label className="sidebar-foot">
-            <input
-              type="checkbox"
-              checked={showAllFiles}
-              onChange={(event) => setShowAllFiles(event.target.checked)}
-            />
-            Mostrar os outros arquivos
-          </label>
-        )}
+        <div className="sidebar-foot">
+          <div className="accent-rule" />
+          {state.bases.length > 0 && (
+            <button
+              type="button"
+              className="foot-row"
+              aria-pressed={showAllFiles}
+              onClick={() => setShowAllFiles((shown) => !shown)}
+            >
+              <EyeIcon size={16} />
+              <span className="foot-label">Outros arquivos</span>
+              <span className="switch" data-on={showAllFiles} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="foot-row"
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            <SettingsIcon size={16} />
+            <span className="foot-label">Ajustes</span>
+            <kbd className="foot-key">⌘,</kbd>
+          </button>
+          <button
+            type="button"
+            className="foot-row"
+            aria-pressed={dark}
+            onClick={() => update('themeMode', dark ? 'light' : 'dark')}
+          >
+            {dark ? <MoonIcon size={16} /> : <SunIcon size={16} />}
+            <span className="foot-label">Modo escuro</span>
+            <span className="switch" data-on={dark} />
+          </button>
+        </div>
       </aside>
 
-      <main className="main">
+      <main className="workspace">
         <Tabs
           state={state}
           onActivate={actions.activateTab}
@@ -125,22 +181,51 @@ export function App() {
           onClose={actions.closeTab}
         />
 
+        {/* The bar stays up whenever there is something for it to carry, which
+            includes the only way back from a collapsed sidebar. */}
+        {(activeTab || !sidebarOpen) && (
+          <header className="topbar">
+            {!sidebarOpen && (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Mostrar a barra lateral"
+                title="Mostrar a barra lateral (⌘\)"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <SidebarIcon />
+              </button>
+            )}
+            {activeTab ? (
+              <Breadcrumbs
+                tab={activeTab}
+                base={state.bases.find((base) => base.id === activeTab.baseId)}
+              />
+            ) : (
+              <span className="crumbs" />
+            )}
+            {activeDoc && (
+              <span className="save-state" data-state={activeDoc.dirty ? 'dirty' : 'saved'}>
+                <span className="save-dot" />
+                {activeDoc.dirty ? 'Não salvo' : 'Salvo'}
+              </span>
+            )}
+          </header>
+        )}
+
         {activeTab && activeDoc ? (
           <>
-            <Breadcrumbs
-              tab={activeTab}
-              base={state.bases.find((base) => base.id === activeTab.baseId)}
-            />
             <EditorPane
               key={activeTab.id}
               tab={activeTab}
               doc={activeDoc}
+              readOnly={activeDoc.shape.lossy || settings.readOnly}
               onChange={(text) => actions.edit(activeTab.id, text)}
               onSave={saveActive}
             />
           </>
         ) : (
-          <EmptyState hasBase={state.bases.length > 0} />
+          <EmptyState hasBase={state.bases.length > 0} onOpenBase={() => void actions.openBase()} />
         )}
 
         <StatusBar
@@ -150,6 +235,18 @@ export function App() {
           onReload={() => state.activeId && void actions.reload(state.activeId)}
         />
       </main>
+
+      {settingsOpen && (
+        <SettingsWindow
+          settings={settings}
+          update={update}
+          reset={reset}
+          onClose={() => setSettingsOpen(false)}
+          onMeasureFocus={setMeasuring}
+        />
+      )}
+
+      <MeasureGuides active={measuring && activeTab !== null} />
 
       {state.error && (
         <div className="toast" role="alert">
@@ -163,20 +260,33 @@ export function App() {
   )
 }
 
-function EmptyState({ hasBase }: { hasBase: boolean }) {
+interface EmptyStateProps {
+  hasBase: boolean
+  onOpenBase: () => void
+}
+
+function EmptyState({ hasBase, onOpenBase }: EmptyStateProps) {
   return (
     <div className="empty">
-      <p className="empty-title">{hasBase ? 'Nenhum arquivo aberto' : 'Nenhuma pasta aberta'}</p>
-      <p className="empty-hint">
-        {hasBase
-          ? 'Um clique abre em prévia, dois cliques fixam a aba.'
-          : 'Abra uma pasta para começar. Nada é copiado, os arquivos ficam onde estão.'}
-      </p>
-      {!hasBase && !supportsDirectoryPicker() && (
-        <p className="empty-warn">
-          Este navegador não abre uma pasta inteira. Use um navegador Chromium ou o app de desktop.
+      <div className="empty-card">
+        <p className="empty-title">{hasBase ? 'Nenhum arquivo aberto' : 'Nenhuma pasta aberta'}</p>
+        <p className="empty-hint">
+          {hasBase
+            ? 'Um clique abre em prévia, dois cliques fixam a aba.'
+            : 'Abra uma pasta para começar. Nada é copiado, os arquivos ficam onde estão.'}
         </p>
-      )}
+        {!hasBase && (
+          <button type="button" className="empty-action" onClick={onOpenBase}>
+            Abrir pasta
+          </button>
+        )}
+        {!hasBase && !supportsDirectoryPicker() && (
+          <p className="empty-warn">
+            Este navegador não abre uma pasta inteira. Use um navegador Chromium ou o app de
+            desktop.
+          </p>
+        )}
+      </div>
     </div>
   )
 }

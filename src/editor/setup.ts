@@ -3,7 +3,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { bracketMatching, indentOnInput } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search'
-import { EditorState, type Extension } from '@codemirror/state'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, drawSelection, keymap, rectangularSelection } from '@codemirror/view'
 import { toggleTask } from './commands'
 import { dialect } from './dialect'
@@ -12,6 +12,16 @@ import { seamlessMarkdown } from './seamless'
 import { tableBlocks } from './tables'
 import { documentTitle } from './title'
 import { editorTheme, markdownHighlight } from './theme'
+
+/**
+ * Read-only is the one setting that is editor state rather than paint, so it
+ * lives in a compartment and is swapped in place instead of rebuilding.
+ */
+export const readOnlyCompartment = new Compartment()
+
+export function readOnlyExtension(readOnly: boolean): Extension {
+  return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]
+}
 
 export interface EditorOptions {
   /** Shown as the heading of the page. It is the file name, not document text. */
@@ -32,8 +42,7 @@ export function editorExtensions({ title, plainText, readOnly, onSave }: EditorO
     search({ top: true }),
     highlightSelectionMatches(),
     EditorView.lineWrapping,
-    EditorState.readOnly.of(readOnly),
-    EditorView.editable.of(!readOnly),
+    readOnlyCompartment.of(readOnlyExtension(readOnly)),
     keymap.of([
       { key: 'Mod-s', preventDefault: true, run: () => (onSave(), true) },
       { key: 'Mod-Enter', preventDefault: true, run: toggleTask },

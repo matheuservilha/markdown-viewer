@@ -116,7 +116,13 @@ function reducer(state: State, action: Action): State {
     case 'doc/edited': {
       const doc = state.docs[action.id]
       if (!doc || doc.text === action.text) return state
-      return { ...state, docs: { ...state.docs, [action.id]: { ...doc, text: action.text, dirty: true } } }
+      return {
+        ...state,
+        // Typing pins the tab. Without this, a preview tab the person has
+        // already written in would be thrown away by the next single click.
+        tabs: state.tabs.map((tab) => (tab.id === action.id ? { ...tab, preview: false } : tab)),
+        docs: { ...state.docs, [action.id]: { ...doc, text: action.text, dirty: true } },
+      }
     }
 
     case 'doc/saved': {

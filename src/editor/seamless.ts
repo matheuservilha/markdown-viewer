@@ -31,8 +31,21 @@ const hidden = Decoration.replace({})
 const headingLine = [1, 2, 3, 4, 5, 6].map((level) =>
   Decoration.line({ class: 'cm-md-heading cm-md-h' + level }),
 )
-const quoteLine = Decoration.line({ class: 'cm-md-quote' })
-const codeLine = Decoration.line({ class: 'cm-md-code' })
+
+/**
+ * Line decorations are compared by their class, so handing CodeMirror the same
+ * object every time spares it work on every keystroke.
+ */
+const lineCache = new Map<string, Decoration>()
+
+function lineDecoration(classes: string): Decoration {
+  let decoration = lineCache.get(classes)
+  if (!decoration) {
+    decoration = Decoration.line({ class: classes })
+    lineCache.set(classes, decoration)
+  }
+  return decoration
+}
 
 /** Inline marks that vanish when the cursor is elsewhere. */
 const INLINE_MARKS = new Set([
@@ -59,19 +72,26 @@ function hasAncestor(node: { node: { parent: unknown } }, name: string): boolean
   return false
 }
 
-/** A line decoration for every line the block covers. */
-function decorateLines(
+/**
+ * A line decoration for every line the block covers, with the first and the
+ * last marked so that only the outer corners of the block round off.
+ */
+function decorateBlock(
   state: EditorState,
   from: number,
   to: number,
-  decoration: Decoration,
+  base: string,
   out: Range<Decoration>[],
 ): void {
   let pos = from
+  let head = true
   while (pos <= to) {
     const line = state.doc.lineAt(pos)
-    out.push(decoration.range(line.from))
-    if (line.to >= to) break
+    const tail = line.to >= to
+    const classes = base + (head ? ' is-first' : '') + (tail ? ' is-last' : '')
+    out.push(lineDecoration(classes).range(line.from))
+    if (tail) break
+    head = false
     pos = line.to + 1
   }
 }
@@ -106,24 +126,11 @@ function build(view: EditorView): DecorationSet {
             const first = state.doc.lineAt(node.from)
             const callout = parseCallout(first.text)
             if (!callout) {
-              decorateLines(state, node.from, node.to, quoteLine, out)
+              decorateBlock(state, node.from, node.to, 'cm-md-quote', out)
               return
             }
 
-            // The box is drawn line by line, with the ends marked so that only
-            // the outer corners round off.
-            const base = 'cm-md-callout cm-md-callout-' + callout.type
-            let pos = node.from
-            let head = true
-            while (pos <= node.to) {
-              const line = state.doc.lineAt(pos)
-              const tail = line.to >= node.to
-              const classes = base + (head ? ' is-first' : '') + (tail ? ' is-last' : '')
-              out.push(Decoration.line({ class: classes }).range(line.from))
-              if (tail) break
-              head = false
-              pos = line.to + 1
-            }
+            decorateBlock(state, node.from, node.to, 'cm-md-callout cm-md-callout-' + callout.type, out)
 
             // The icon stays put in both states, so revealing `[!tip]` does not
             // shift the title sideways.
@@ -139,7 +146,7 @@ function build(view: EditorView): DecorationSet {
           }
           case 'FencedCode':
           case 'CodeBlock':
-            decorateLines(state, node.from, node.to, codeLine, out)
+            decorateBlock(state, node.from, node.to, 'cm-md-code', out)
             return
           case 'Table':
             // A collapsed table is drawn whole by `tableBlocks`, and nothing

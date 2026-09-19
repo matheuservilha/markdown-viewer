@@ -10,11 +10,11 @@ import { highlightTag, wikilinkTag } from './dialect'
 
 export const editorTheme = EditorView.theme({
   '&': {
-    color: 'var(--text)',
-    backgroundColor: 'var(--bg)',
+    height: '100%',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
     fontFamily: 'var(--font-body)',
     fontSize: 'var(--font-size)',
-    height: '100%',
   },
   '.cm-scroller': {
     fontFamily: 'inherit',
@@ -27,18 +27,50 @@ export const editorTheme = EditorView.theme({
     overscrollBehavior: 'contain',
   },
   '.cm-content': {
-    caretColor: 'var(--accent)',
-    padding: '3rem 0 40vh',
     maxWidth: 'var(--measure)',
+    padding: '32px 0 40vh',
     margin: '0 auto',
+    caretColor: 'var(--accent)',
   },
-  '.cm-line': { padding: '0 1rem' },
+  '.cm-line': { padding: '0 20px' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
+  '&.cm-focused, &': { boxShadow: 'none' },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeft: '2px solid var(--accent)',
+  },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-    backgroundColor: 'var(--selection)',
+    background: 'var(--selection)',
   },
   '.cm-activeLine': { backgroundColor: 'transparent' },
+  '.cm-gutters': { display: 'none' },
+  '.cm-panels': {
+    border: '0',
+    background: 'var(--surface-2)',
+    color: 'var(--text-secondary)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '12px',
+  },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border-subtle)' },
+  '.cm-textfield': {
+    border: '1px solid var(--border-default)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'var(--surface-1)',
+    color: 'var(--text-primary)',
+  },
+  '.cm-button': {
+    border: '1px solid var(--border-default)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'var(--surface-1)',
+    backgroundImage: 'none',
+    color: 'var(--text-secondary)',
+  },
+  '.cm-searchMatch': {
+    borderRadius: '3px',
+    background: 'color-mix(in srgb, var(--accent) 22%, transparent)',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': {
+    background: 'color-mix(in srgb, var(--accent) 45%, transparent)',
+  },
 
   // CodeMirror puts a zero-width <img> on each side of a replaced range so the
   // caret has somewhere to land. By default the image is 1em tall and aligned to
@@ -46,118 +78,136 @@ export const editorTheme = EditorView.theme({
   // that pushes the line one pixel taller the moment the syntax is hidden. A
   // zero-height box on the baseline cannot grow the line box in any font.
   '.cm-widgetBuffer': { height: '0', verticalAlign: 'baseline' },
-  '.cm-gutters': { display: 'none' },
 
-  // Headings. The line keeps its own line-height so that revealing the '#'
-  // never changes the height of the line.
-  '.cm-md-heading': { fontFamily: 'var(--font-heading)', fontWeight: '650', color: 'var(--heading)' },
-  '.cm-md-h1': { fontSize: '1.8em', lineHeight: '1.3', paddingTop: '0.6em' },
-  '.cm-md-h2': { fontSize: '1.5em', lineHeight: '1.3', paddingTop: '0.5em' },
-  '.cm-md-h3': { fontSize: '1.28em', lineHeight: '1.35' },
-  '.cm-md-h4': { fontSize: '1.13em', lineHeight: '1.4' },
-  '.cm-md-h5': { fontSize: '1em' },
-  '.cm-md-h6': { fontSize: '0.92em', color: 'var(--text-dim)' },
-
-  '.cm-md-quote': {
-    borderLeft: '3px solid var(--quote-bar)',
-    color: 'var(--text-dim)',
-    fontStyle: 'italic',
-  },
   // The file name, at the top of the page and in the shape of a title.
   '.cm-md-title': {
-    margin: '0 1rem 0.9em',
+    margin: '0 20px 1em',
+    color: 'var(--text-primary)',
     fontFamily: 'var(--font-heading)',
-    fontSize: '2.1em',
-    fontWeight: '700',
-    lineHeight: '1.15',
-    color: 'var(--heading)',
+    fontSize: '1.74em',
+    fontWeight: '640',
+    letterSpacing: '-0.025em',
+    lineHeight: '1.2',
   },
 
-  // Tables, drawn as a grid while the cursor is elsewhere.
-  '.cm-md-table-wrap': { margin: '0.3em 1rem 1.3em', overflowX: 'auto' },
-  '.cm-md-table': {
-    borderCollapse: 'collapse',
+  // Headings. Each line keeps its own line-height so that revealing the '#'
+  // never changes the height of the line.
+  '.cm-md-heading': {
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-heading)',
+    fontWeight: '620',
+  },
+  '.cm-md-h1': { fontSize: '1.5em', letterSpacing: '-0.02em', lineHeight: '1.3', paddingTop: '0.8em' },
+  '.cm-md-h2': { fontSize: '1.28em', letterSpacing: '-0.015em', lineHeight: '1.35', paddingTop: '0.7em' },
+  '.cm-md-h3': { fontSize: '1.12em', lineHeight: '1.4', paddingTop: '0.5em' },
+  '.cm-md-h4': { fontSize: '1em', paddingTop: '0.4em' },
+  '.cm-md-h5': { fontSize: '0.94em' },
+  '.cm-md-h6': { fontSize: '0.88em', color: 'var(--text-tertiary)' },
 
-    // Natural column widths, but never narrower than the column of text.
-    width: 'auto',
-    minWidth: '100%',
-    fontFamily: 'var(--font-ui)',
-    fontSize: '0.85em',
-  },
-  '.cm-md-table th, .cm-md-table td': {
-    padding: '5px 10px',
-    border: '1px solid var(--border)',
-    verticalAlign: 'top',
-
-    // The editor breaks long words to keep prose inside the column. A table
-    // cell that does the same reads as a typo.
-    overflowWrap: 'normal',
-    wordBreak: 'normal',
-  },
-  '.cm-md-table thead th': {
-    background: 'var(--bg-sunken)',
-    fontWeight: '650',
-    color: 'var(--text-strong)',
-  },
-  '.cm-md-table tbody tr:nth-child(even)': {
-    background: 'color-mix(in srgb, var(--text) 3%, transparent)',
+  // Quote.
+  '.cm-md-quote': {
+    borderLeft: '2px solid var(--border-emphasis)',
+    paddingLeft: '18px',
+    color: 'var(--text-tertiary)',
   },
 
-  // Front matter, drawn as a block of properties.
+  // Code block. The ends are rounded, which needs the first and last lines
+  // marked, and the fence stays visible as a dim hairline of text.
+  '.cm-md-code': {
+    background: 'var(--code-bg)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.84em',
+    lineHeight: '1.65',
+  },
+  '.cm-md-code.is-first': {
+    marginTop: '0.5em',
+    paddingTop: '0.5em',
+    borderTopLeftRadius: 'var(--radius-md)',
+    borderTopRightRadius: 'var(--radius-md)',
+  },
+  '.cm-md-code.is-last': {
+    marginBottom: '0.9em',
+    paddingBottom: '0.6em',
+    borderBottomLeftRadius: 'var(--radius-md)',
+    borderBottomRightRadius: 'var(--radius-md)',
+  },
+
+  '.cm-md-bullet': { color: 'var(--accent)' },
+  '.cm-md-task': {
+    margin: '0 0.3em 0 0',
+    accentColor: 'var(--accent)',
+    verticalAlign: '-0.12em',
+  },
+  '.cm-md-rule': {
+    display: 'inline-block',
+    width: '100%',
+    borderTop: '1px solid var(--border-default)',
+    verticalAlign: 'middle',
+  },
+
+  // The file name, front matter and everything else sit inside the same column,
+  // so blocks use the same 20px side inset as the text lines.
   '.cm-md-frontmatter': {
-    margin: '0 1rem 1.6em',
-    padding: '0.6rem 0.85rem',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    background: 'var(--bg-sunken)',
+    margin: '0 20px 1.6em',
+    padding: '12px 14px',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-lg)',
+    background: 'var(--surface-1)',
     fontFamily: 'var(--font-ui)',
-    fontSize: '0.78em',
+    fontSize: '0.76em',
     lineHeight: '1.5',
     cursor: 'default',
   },
   '.cm-md-prop': {
     display: 'grid',
-    gridTemplateColumns: 'minmax(5rem, 9rem) 1fr',
-    gap: '0.5rem',
-    padding: '2px 0',
+    gap: '10px',
+    gridTemplateColumns: 'minmax(5rem, 8rem) 1fr',
+    padding: '3px 0',
   },
-  '.cm-md-prop-key': { color: 'var(--text-faint)' },
-  '.cm-md-prop-values': { display: 'flex', flexWrap: 'wrap', gap: '4px', color: 'var(--text)' },
+  '.cm-md-prop-key': { color: 'var(--text-disabled)' },
+  '.cm-md-prop-values': {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '5px',
+    color: 'var(--text-secondary)',
+  },
   '.cm-md-chip': {
-    padding: '1px 7px',
+    padding: '1px 8px',
     borderRadius: '999px',
-    background: 'color-mix(in srgb, var(--accent) 16%, transparent)',
-    color: 'var(--text)',
+    background: 'color-mix(in srgb, var(--accent) 13%, transparent)',
+    color: 'var(--accent-text)',
+    fontSize: '0.94em',
+    fontWeight: '500',
   },
 
-  // Callouts. The type class only sets two variables, and the box below reads
-  // them, so a new type is one entry in the palette.
+  // Callouts. The type class only sets one variable, and the box below reads
+  // it, so a new type is one entry in the palette.
   '.cm-md-callout': {
-    backgroundColor: 'color-mix(in srgb, var(--callout-color) 10%, transparent)',
-    borderLeft: '3px solid var(--callout-color)',
-    paddingLeft: '0.85rem',
+    paddingLeft: '18px',
+    borderLeft: '2px solid var(--callout-color)',
+    background: 'color-mix(in srgb, var(--callout-color) 8%, transparent)',
+    color: 'var(--text-secondary)',
     fontStyle: 'normal',
-    color: 'var(--text)',
   },
   '.cm-md-callout.is-first': {
-    marginTop: '0.7em',
-    paddingTop: '0.35em',
-    borderTopRightRadius: 'var(--radius)',
-    fontWeight: '650',
+    marginTop: '0.8em',
+    paddingTop: '0.5em',
+    borderTopRightRadius: 'var(--radius-md)',
     color: 'var(--callout-color)',
+    fontWeight: '600',
   },
   '.cm-md-callout.is-last': {
-    marginBottom: '0.7em',
-    paddingBottom: '0.45em',
-    borderBottomRightRadius: 'var(--radius)',
+    marginBottom: '0.9em',
+    paddingBottom: '0.6em',
+    borderBottomRightRadius: 'var(--radius-md)',
   },
   '.cm-md-callout-icon': {
     display: 'inline-block',
-    width: '16px',
-    height: '16px',
-    marginRight: '0.4em',
-    verticalAlign: '-0.18em',
+    width: '15px',
+    height: '15px',
+    marginRight: '0.45em',
     color: 'var(--callout-color)',
+    verticalAlign: '-0.16em',
   },
   '.cm-md-callout-note': { '--callout-color': 'var(--tone-blue)' },
   '.cm-md-callout-abstract': { '--callout-color': 'var(--tone-teal)' },
@@ -170,37 +220,74 @@ export const editorTheme = EditorView.theme({
   '.cm-md-callout-failure': { '--callout-color': 'var(--tone-red)' },
   '.cm-md-callout-bug': { '--callout-color': 'var(--tone-red)' },
   '.cm-md-callout-example': { '--callout-color': 'var(--tone-purple)' },
-  '.cm-md-callout-quote': { '--callout-color': 'var(--text-faint)' },
+  '.cm-md-callout-quote': { '--callout-color': 'var(--border-emphasis)' },
 
-  '.cm-md-code': {
-    backgroundColor: 'var(--code-bg)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '0.92em',
+  // Tables, drawn as a grid while the cursor is elsewhere.
+  '.cm-md-table-wrap': { margin: '0.4em 20px 1.4em', overflowX: 'auto' },
+  '.cm-md-table': {
+    // Natural column widths, but never narrower than the column of text.
+    width: 'auto',
+    minWidth: '100%',
+    borderCollapse: 'separate',
+    borderSpacing: '0',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-md)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '0.8em',
   },
-  '.cm-md-bullet': { color: 'var(--accent)' },
-  '.cm-md-task': { accentColor: 'var(--accent)', margin: '0 0.15em 0 0', verticalAlign: '-0.1em' },
-  '.cm-md-rule': {
-    display: 'inline-block',
-    width: '100%',
-    borderTop: '1px solid var(--border)',
-    verticalAlign: 'middle',
+  '.cm-md-table th, .cm-md-table td': {
+    padding: '7px 12px',
+    borderBottom: '1px solid var(--border-subtle)',
+    verticalAlign: 'top',
+
+    // The editor breaks long words to keep prose inside the column. A table
+    // cell that does the same reads as a typo.
+    overflowWrap: 'normal',
+    wordBreak: 'normal',
   },
+  '.cm-md-table th + th, .cm-md-table td + td': {
+    borderLeft: '1px solid var(--border-subtle)',
+  },
+  '.cm-md-table tbody tr:last-child td': { borderBottom: '0' },
+  '.cm-md-table thead th': {
+    background: 'var(--surface-1)',
+    color: 'var(--text-primary)',
+    fontWeight: '580',
+    textAlign: 'left',
+  },
+  '.cm-md-table td': { color: 'var(--text-secondary)' },
 })
 
 export const markdownHighlight = syntaxHighlighting(
   HighlightStyle.define([
-    { tag: t.strong, fontWeight: '650', color: 'var(--text-strong)' },
+    { tag: t.strong, color: 'var(--text-primary)', fontWeight: '620' },
     { tag: t.emphasis, fontStyle: 'italic' },
-    { tag: t.strikethrough, textDecoration: 'line-through', color: 'var(--text-dim)' },
-    { tag: highlightTag, backgroundColor: 'var(--highlight-bg)', borderRadius: '2px' },
-    { tag: [t.link, t.url, wikilinkTag], color: 'var(--link)' },
-    { tag: t.monospace, fontFamily: 'var(--font-mono)', backgroundColor: 'var(--code-bg)' },
+    { tag: t.strikethrough, color: 'var(--text-disabled)', textDecoration: 'line-through' },
+    {
+      tag: highlightTag,
+      background: 'color-mix(in srgb, var(--tone-yellow) 26%, transparent)',
+      borderRadius: '3px',
+      color: 'var(--text-primary)',
+    },
+    { tag: [t.link, t.url, wikilinkTag], color: 'var(--accent-text)' },
+    {
+      tag: t.monospace,
+      padding: '0.1em 0.3em',
+      borderRadius: '4px',
+      background: 'var(--code-bg)',
+      color: 'var(--text-primary)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.86em',
+    },
     { tag: t.processingInstruction, color: 'var(--syntax-mark)' },
     { tag: t.keyword, color: 'var(--syntax-keyword)' },
     { tag: [t.string, t.special(t.string)], color: 'var(--syntax-string)' },
-    { tag: t.comment, color: 'var(--text-faint)', fontStyle: 'italic' },
+    { tag: t.comment, color: 'var(--text-disabled)', fontStyle: 'italic' },
     { tag: [t.number, t.bool, t.null], color: 'var(--syntax-number)' },
-    { tag: [t.function(t.variableName), t.definition(t.variableName)], color: 'var(--syntax-function)' },
+    {
+      tag: [t.function(t.variableName), t.definition(t.variableName)],
+      color: 'var(--syntax-function)',
+    },
     { tag: t.typeName, color: 'var(--syntax-type)' },
   ]),
 )

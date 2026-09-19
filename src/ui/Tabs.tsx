@@ -1,4 +1,5 @@
 import type { State } from '~/app/store'
+import { CloseIcon } from './icons'
 
 interface Props {
   state: State
@@ -23,7 +24,8 @@ export function Tabs({ state, onActivate, onPin, onClose }: Props) {
             className={
               'tab' +
               (state.activeId === tab.id ? ' is-active' : '') +
-              (tab.preview ? ' is-preview' : '')
+              (tab.preview ? ' is-preview' : '') +
+              (dirty ? ' is-dirty' : '')
             }
             title={tab.path}
             onClick={() => onActivate(tab.id)}
@@ -33,16 +35,19 @@ export function Tabs({ state, onActivate, onPin, onClose }: Props) {
             }}
           >
             <span className="tab-name">{tab.name}</span>
+            {/* The dot marks unsaved work, and gives way to the close button
+                on hover so that a dirty tab is still closable in one click. */}
+            <span className="tab-dot" aria-label="Não salvo" />
             <button
               type="button"
-              className={'tab-close' + (dirty ? ' is-dirty' : '')}
-              aria-label={dirty ? 'Fechar sem salvar ' + tab.name : 'Fechar ' + tab.name}
+              className="tab-close"
+              aria-label={'Fechar ' + tab.name}
               onClick={(event) => {
                 event.stopPropagation()
                 onClose(tab.id)
               }}
             >
-              {dirty ? '●' : '×'}
+              <CloseIcon size={12} />
             </button>
           </div>
         )
