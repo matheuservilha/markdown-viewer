@@ -281,11 +281,6 @@ export interface ExportOptions {
    * palette, which is what a PDF needs: paper is white everywhere.
    */
   theme?: 'auto' | 'light'
-  /**
-   * Set when the page is going to be rasterised into a PDF rather than opened
-   * in a browser. See `RASTER_SAFE` for what that costs and why.
-   */
-  forRaster?: boolean
 }
 
 export async function exportDocument(
@@ -295,9 +290,7 @@ export async function exportDocument(
   options: ExportOptions = {},
 ): Promise<string> {
   const body = await renderMarkdown(text, source)
-  const style =
-    (options.theme === 'light' ? STYLE.replace(DARK_BLOCK, '') : STYLE) +
-    (options.forRaster ? RASTER_SAFE : '')
+  const style = options.theme === 'light' ? STYLE.replace(DARK_BLOCK, '') : STYLE
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -315,19 +308,6 @@ ${body}
 </html>
 `
 }
-
-/*
- * The rasteriser draws an inline element that wraps across lines from the box
- * that encloses all of its fragments, so a background on such an element lands
- * in the wrong place and takes its text with it: words move, and some vanish.
- * Measured, not guessed. For the PDF the backgrounds come off and the meaning
- * is carried by the face and the colour instead.
- */
-const RASTER_SAFE = `
-code { padding: 0; background: none; color: var(--dim); }
-pre code { color: inherit; }
-mark { background: none; color: inherit; border-bottom: 2px solid var(--yellow); }
-`
 
 const DARK_BLOCK = `@media (prefers-color-scheme: dark) {
   :root {

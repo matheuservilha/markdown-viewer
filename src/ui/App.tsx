@@ -4,6 +4,7 @@ import { useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, parentPath, type Entry } from '~/platform/fs'
 import { exportDocument } from '~/editor/export-html'
+import { exportPdf } from '~/editor/export-pdf'
 import { fileSystem, platform } from '~/platform'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
@@ -13,7 +14,6 @@ import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { MeasureGuides } from './MeasureGuides'
 import { SettingsWindow } from './SettingsWindow'
 import { SidebarResizer } from './SidebarResizer'
-import { htmlToPdf } from './pdf'
 import { canPrint, printHtml } from './print'
 import { StatusBar } from './StatusBar'
 import { Tabs } from './Tabs'
@@ -175,8 +175,8 @@ export function App() {
     }
     const copy = (text: string) => void navigator.clipboard.writeText(text)
     const stem = tab.name.replace(/\.[^.]+$/, '')
-    const html = (palette: 'auto' | 'light', forRaster = false) =>
-      exportDocument(stem, doc.text, source, { theme: palette, forRaster })
+    const html = (palette: 'auto' | 'light') =>
+      exportDocument(stem, doc.text, source, { theme: palette })
 
     return [
       {
@@ -188,14 +188,14 @@ export function App() {
         },
       },
       {
-        // Built inside the app rather than handed to a print dialog, so the
-        // file comes out the same on every platform, and always on white paper.
+        // Laid out from the syntax tree rather than photographed from a web
+        // page, so the text in the file is text: selectable, searchable, and
+        // never cut in half by a page break.
         label: 'Exportar PDF',
         hint: '⌘P',
         onSelect: () => {
           setBusy('Gerando o PDF')
-          void html('light', true)
-            .then((page) => htmlToPdf(page))
+          void exportPdf(stem, doc.text, source)
             .then((bytes) => files.saveAs(stem + '.pdf', bytes))
             .catch((error: unknown) =>
               setNotice(error instanceof Error ? error.message : String(error)),
