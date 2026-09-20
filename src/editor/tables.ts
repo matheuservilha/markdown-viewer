@@ -12,6 +12,7 @@
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
 import { activeLines, overlaps } from './active'
+import { closeMenu, openMenu, type MenuEntry } from './menu'
 import {
   insertColumn,
   insertRow,
@@ -21,6 +22,7 @@ import {
   cellRange,
   escapeCell,
   serializeTable,
+  setAlign,
   setCell,
   type TableModel,
 } from './table-model'
@@ -121,13 +123,17 @@ function findTables(state: EditorState): Span[] {
   return found
 }
 
+/** The table that starts at this position, read from the live document. */
+function tableAt(state: EditorState, from: number): Span | null {
+  return findTables(state).find((table) => table.from === from) ?? null
+}
+
 type Focus = { row: number; column: number }
 
 class TableWidget extends WidgetType {
   constructor(
     private readonly text: string,
     private readonly from: number,
-    private readonly to: number,
   ) {
     super()
   }
@@ -148,10 +154,25 @@ class TableWidget extends WidgetType {
       return wrapper
     }
 
-    const write = (next: TableModel, focus: Focus | null) => {
-      pendingFocus = focus === null ? null : { from: this.from, ...focus }
+    /**
+     * Applies a change to the table.
+     *
+     * The table is read again from the live document instead of from the model
+     * this widget was built with: a cell being edited commits on the way here,
+     * which moves the end of the table.
+     */
+    const act = (change: (table: TableModel) => TableModel, focus: Focus | null) => {
+      const editing = wrapper.querySelector<HTMLElement>('.cm-md-cell-text:focus')
+      editing?.blur()
+
+      const span = tableAt(view.state, this.from)
+      if (!span) return
+      const current = parseTable(view.state.doc.sliceString(span.from, span.to))
+      if (!current) return
+
+      pendingFocus = focus === null ? null : { from: span.from, ...focus }
       view.dispatch({
-        changes: { from: this.from, to: this.to, insert: serializeTable(next) },
+        changes: { from: span.from, to: span.to, insert: serializeTable(change(current)) },
       })
     }
 
@@ -160,12 +181,12 @@ class TableWidget extends WidgetType {
      *
      * Rewriting the whole table for a single word would normalise the spacing
      * and the dashes the person typed, which is a reformat they did not ask
-     * for. Only a structural change (a row or a column) goes through `write`.
+     * for. Only a structural change goes through `act`.
      */
     const writeCell = (row: number, column: number, value: string, focus: Focus | null) => {
       const range = cellRange(this.text, row, column)
       if (!range) {
-        write(setCell(model, row, column, value), focus)
+        act((table) => setCell(table, row, column, value), focus)
         return
       }
       pendingFocus = focus === null ? null : { from: this.from, ...focus }
@@ -178,6 +199,11 @@ class TableWidget extends WidgetType {
           insert: pad + escapeCell(value) + (pad === '' ? '' : ' '),
         },
       })
+    }
+
+    const asPlainText = () => {
+      view.dispatch({ selection: { anchor: this.from }, effects: showTableAsText.of(this.from) })
+      view.focus()
     }
 
     const table = document.createElement('table')
@@ -217,10 +243,13 @@ class TableWidget extends WidgetType {
       }
       if (nextRow < -1) return
       if (nextRow >= model.rows.length) {
-        write(insertRow(model, model.rows.length), { row: model.rows.length, column: 0 })
+        act((current) => insertRow(current, current.rows.length), {
+          row: model.rows.length,
+          column: 0,
+        })
         return
       }
-      if (!focusCell(nextRow, nextColumn)) return
+      focusCell(nextRow, nextColumn)
     }
 
     const makeCell = (row: number, column: number) => {
@@ -250,7 +279,6 @@ class TableWidget extends WidgetType {
         if (event.key === 'Tab') {
           event.preventDefault()
           if (!commit(null)) step(row, column, event.shiftKey ? -1 : 1)
-          else step(row, column, event.shiftKey ? -1 : 1)
           return
         }
         if (event.key === 'Enter') {
@@ -271,64 +299,104 @@ class TableWidget extends WidgetType {
       return element
     }
 
-    // ---- header, with the controls for each column ------------------------
+    // ---- the handles: thin bars on the edge, like a spreadsheet ------------
+    const handle = (kind: 'col' | 'row', entries: () => MenuEntry[]) => {
+      const bar = document.createElement('div')
+      bar.className = 'cm-md-' + kind + '-handle'
+      bar.title = kind === 'col' ? 'Opções da coluna' : 'Opções da linha'
+      bar.addEventListener('mousedown', (event) => {
+        // Not letting the press through keeps the focus, and the unsaved text,
+        // in the cell that is being edited.
+        event.preventDefault()
+        event.stopPropagation()
+        const box = bar.getBoundingClientRect()
+        openMenu(box.left, box.bottom + 4, entries())
+      })
+      return bar
+    }
+
+    const columnMenu = (column: number): MenuEntry[] => [
+      { label: 'Inserir coluna à esquerda', run: () => act((t) => insertColumn(t, column), { row: -1, column }) },
+      {
+        label: 'Inserir coluna à direita',
+        run: () => act((t) => insertColumn(t, column + 1), { row: -1, column: column + 1 }),
+      },
+      {
+        label: 'Alinhar à esquerda',
+        current: (model.align[column] ?? 'left') === 'left',
+        separated: true,
+        run: () => act((t) => setAlign(t, column, 'left'), null),
+      },
+      {
+        label: 'Centralizar',
+        current: model.align[column] === 'center',
+        run: () => act((t) => setAlign(t, column, 'center'), null),
+      },
+      {
+        label: 'Alinhar à direita',
+        current: model.align[column] === 'right',
+        run: () => act((t) => setAlign(t, column, 'right'), null),
+      },
+      {
+        label: 'Remover coluna',
+        destructive: true,
+        separated: true,
+        run: () => act((t) => removeColumn(t, column), null),
+      },
+    ]
+
+    const rowMenu = (row: number): MenuEntry[] => [
+      { label: 'Inserir linha acima', run: () => act((t) => insertRow(t, row), { row, column: 0 }) },
+      {
+        label: 'Inserir linha abaixo',
+        run: () => act((t) => insertRow(t, row + 1), { row: row + 1, column: 0 }),
+      },
+      {
+        label: 'Remover linha',
+        destructive: true,
+        separated: true,
+        run: () => act((t) => removeRow(t, row), null),
+      },
+    ]
+
     const thead = document.createElement('thead')
     const headRow = document.createElement('tr')
-    headRow.append(gutterCell(''))
-
     model.header.forEach((_, column) => {
       const cell = makeCell(-1, column)
-      const tools = document.createElement('span')
-      tools.className = 'cm-md-col-tools'
-      tools.append(
-        control('+', 'Inserir coluna à direita', () =>
-          write(insertColumn(model, column + 1), { row: -1, column: column + 1 }),
-        ),
-        control('×', 'Remover esta coluna', () => write(removeColumn(model, column), null)),
-      )
-      cell.append(tools)
+      cell.append(handle('col', () => columnMenu(column)))
       headRow.append(cell)
     })
-
     thead.append(headRow)
     table.append(thead)
 
-    // ---- body, with a control for each row --------------------------------
     const tbody = document.createElement('tbody')
     model.rows.forEach((_, row) => {
       const tr = document.createElement('tr')
-      const gutter = gutterCell('')
-      gutter.append(
-        control('+', 'Inserir linha abaixo', () =>
-          write(insertRow(model, row + 1), { row: row + 1, column: 0 }),
-        ),
-        control('×', 'Remover esta linha', () => write(removeRow(model, row), null)),
-      )
-      tr.append(gutter)
-      for (let column = 0; column < width; column++) tr.append(makeCell(row, column))
+      for (let column = 0; column < width; column++) {
+        const cell = makeCell(row, column)
+        if (column === 0) cell.append(handle('row', () => rowMenu(row)))
+        tr.append(cell)
+      }
       tbody.append(tr)
     })
     table.append(tbody)
 
-    // ---- what to do with the whole table ----------------------------------
-    const foot = document.createElement('div')
-    foot.className = 'cm-md-table-foot'
-    foot.append(
-      control('+ linha', 'Adicionar linha no fim', () =>
-        write(insertRow(model, model.rows.length), { row: model.rows.length, column: 0 }),
-      ),
-      control('+ coluna', 'Adicionar coluna no fim', () =>
-        write(insertColumn(model, width), { row: -1, column: width }),
-      ),
-      control('texto', 'Editar esta tabela como Markdown', () => {
-        view.dispatch({
-          selection: { anchor: this.from },
-          effects: showTableAsText.of(this.from),
-        })
-        view.focus()
-      }),
-    )
-    wrapper.append(foot)
+    // ---- the whole table, on the right button -----------------------------
+    wrapper.addEventListener('contextmenu', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      openMenu(event.clientX, event.clientY, [
+        {
+          label: 'Inserir linha no fim',
+          run: () => act((t) => insertRow(t, t.rows.length), { row: model.rows.length, column: 0 }),
+        },
+        {
+          label: 'Inserir coluna no fim',
+          run: () => act((t) => insertColumn(t, t.header.length), { row: -1, column: width }),
+        },
+        { label: 'Editar como texto', separated: true, run: asPlainText },
+      ])
+    })
 
     if (pendingFocus && pendingFocus.from === this.from) {
       const { row, column } = pendingFocus
@@ -339,36 +407,17 @@ class TableWidget extends WidgetType {
     return wrapper
   }
 
+  /** A menu opened from this table has nothing to point at once it is gone. */
+  destroy(): void {
+    closeMenu()
+  }
+
   /** Everything inside the grid is the grid's business, not the editor's. */
   ignoreEvent(): boolean {
     return true
   }
 }
 
-/**
- * A button that acts on mouse down, not on click: the cell about to lose focus
- * would otherwise commit first and rebuild the table under the pointer.
- */
-function control(label: string, title: string, run: () => void): HTMLButtonElement {
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = 'cm-md-table-button'
-  button.textContent = label
-  button.title = title
-  button.addEventListener('mousedown', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    run()
-  })
-  return button
-}
-
-function gutterCell(text: string): HTMLTableCellElement {
-  const cell = document.createElement('td')
-  cell.className = 'cm-md-table-gutter'
-  cell.textContent = text
-  return cell
-}
 
 function draw(state: EditorState, tables: Span[]): DecorationSet {
   if (tables.length === 0) return Decoration.none
@@ -382,7 +431,7 @@ function draw(state: EditorState, tables: Span[]): DecorationSet {
     decorations.push(
       Decoration.replace({
         block: true,
-        widget: new TableWidget(state.doc.sliceString(table.from, table.to), table.from, table.to),
+        widget: new TableWidget(state.doc.sliceString(table.from, table.to), table.from),
       }).range(table.from, table.to),
     )
   }

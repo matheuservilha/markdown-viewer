@@ -29,14 +29,33 @@ afterEach(() => {
 const grid = () => document.querySelector('.cm-md-table')
 const cell = (row: number, column: number) =>
   document.querySelector<HTMLElement>(`[data-row="${row}"][data-column="${column}"]`)
-const button = (label: string) =>
-  [...document.querySelectorAll<HTMLButtonElement>('.cm-md-table-button')].find(
-    (node) => node.textContent === label,
+/** The thin bar above a column, which opens that column's menu. */
+const columnHandle = (column: number) =>
+  cell(-1, column)!.parentElement!.querySelector<HTMLElement>('.cm-md-col-handle')!
+/** The thin bar left of a row. */
+const rowHandle = (row: number) =>
+  document
+    .querySelectorAll('.cm-md-table tbody tr')
+    [row]!.querySelector<HTMLElement>('.cm-md-row-handle')!
+
+const menuItems = () =>
+  [...document.querySelectorAll<HTMLElement>('.menu .menu-item')].map((item) => item.textContent!)
+
+/** Opens a handle's menu and picks the entry that starts with this label. */
+const pick = (handle: HTMLElement, label: string) => {
+  press(handle)
+  const item = [...document.querySelectorAll<HTMLElement>('.menu .menu-item')].find((node) =>
+    node.textContent!.startsWith(label),
   )
-/** The `+` and `×` of a column live on the header cell, beside its text. */
-const columnTools = (column: number) => [
-  ...cell(-1, column)!.parentElement!.querySelectorAll<HTMLElement>('.cm-md-table-button'),
-]
+  if (!item) throw new Error('sem "' + label + '" no menu: ' + menuItems().join(' / '))
+  item.click()
+}
+
+/** The menu of the table as a whole, on the right button. */
+const rightClick = () =>
+  document
+    .querySelector('.cm-md-table-wrap')!
+    .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
 const press = (node: HTMLElement | undefined) =>
   node?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
 
@@ -78,46 +97,88 @@ describe('a grade editável', () => {
     expect(editor.state.doc.toString()).toContain('| a \\| b | 1 |')
   })
 
-  it('o + da coluna insere uma coluna à direita', () => {
+  it('o menu da coluna insere uma coluna à direita', () => {
     const editor = mount()
-    press(columnTools(0)[0])
+    pick(columnHandle(0), 'Inserir coluna à direita')
     expect(editor.state.doc.toString().split('\n')[0]).toBe('| Coluna |  | Nota |')
   })
 
-  it('o × da coluna remove aquela coluna', () => {
+  it('o menu da coluna insere uma coluna à esquerda', () => {
     const editor = mount()
-    press(columnTools(1)[1])
+    pick(columnHandle(0), 'Inserir coluna à esquerda')
+    expect(editor.state.doc.toString().split('\n')[0]).toBe('|  | Coluna | Nota |')
+  })
+
+  it('o menu da coluna muda o alinhamento', () => {
+    const editor = mount()
+    pick(columnHandle(0), 'Centralizar')
+    expect(editor.state.doc.toString().split('\n')[1]).toBe('|:-:|:-:|')
+  })
+
+  it('o menu marca o alinhamento em vigor', () => {
+    mount()
+    press(columnHandle(1))
+    expect(menuItems()).toContain('Centralizar✓')
+  })
+
+  it('o menu da coluna remove aquela coluna', () => {
+    const editor = mount()
+    pick(columnHandle(1), 'Remover coluna')
     expect(editor.state.doc.toString().split('\n')[0]).toBe('| Coluna |')
   })
 
   it('nunca remove a última coluna', () => {
     const editor = mount(['| só |', '|---|', '| 1 |'].join('\n'))
-    press(columnTools(0)[1])
+    pick(columnHandle(0), 'Remover coluna')
     expect(editor.state.doc.toString()).toContain('| só |')
   })
 
-  it('o × da linha remove aquela linha', () => {
+  it('o menu da linha remove aquela linha', () => {
     const editor = mount()
-    const gutter = document.querySelectorAll('.cm-md-table tbody tr')[0]!
-    press(gutter.querySelectorAll<HTMLElement>('.cm-md-table-button')[1])
+    pick(rowHandle(0), 'Remover linha')
     const lines = editor.state.doc.toString().split('\n')
     expect(lines).toHaveLength(3)
     expect(lines[2]).toBe('| dois | 2 |')
   })
 
-  it('os botões do rodapé acrescentam linha e coluna', () => {
+  it('o menu da linha insere uma linha abaixo', () => {
     const editor = mount()
-    press(button('+ linha'))
-    expect(editor.state.doc.toString().split('\n')).toHaveLength(5)
-    press(button('+ coluna'))
+    pick(rowHandle(0), 'Inserir linha abaixo')
+    const lines = editor.state.doc.toString().split('\n')
+    expect(lines).toHaveLength(5)
+    expect(lines[3]).toBe('|  |  |')
+  })
+
+  it('o botão direito acrescenta no fim da tabela', () => {
+    const editor = mount()
+    rightClick()
+    const item = [...document.querySelectorAll<HTMLElement>('.menu .menu-item')].find((node) =>
+      node.textContent!.startsWith('Inserir coluna no fim'),
+    )!
+    item.click()
     expect(editor.state.doc.toString().split('\n')[0]).toBe('| Coluna | Nota |  |')
   })
 
-  it('"texto" troca a grade pelo Markdown cru', () => {
+  it('"editar como texto" troca a grade pelo Markdown cru', () => {
     mount()
     expect(grid()).not.toBeNull()
-    press(button('texto'))
+    rightClick()
+    const item = [...document.querySelectorAll<HTMLElement>('.menu .menu-item')].find((node) =>
+      node.textContent!.startsWith('Editar como texto'),
+    )!
+    item.click()
     expect(grid()).toBeNull()
+  })
+
+  it('não há botão nenhum desenhado na tabela', () => {
+    mount()
+    expect(document.querySelectorAll('.cm-md-table-wrap button')).toHaveLength(0)
+  })
+
+  it('as alças existem desde o começo, para o hover não mexer no layout', () => {
+    mount()
+    expect(document.querySelectorAll('.cm-md-col-handle')).toHaveLength(2)
+    expect(document.querySelectorAll('.cm-md-row-handle')).toHaveLength(2)
   })
 
   // O foco em si é coisa do navegador, que o jsdom não move para um
@@ -151,5 +212,20 @@ describe('a grade editável', () => {
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(field.textContent).toBe('um')
     expect(editor.state.doc.toString()).toBe(before)
+  })
+
+  it('o menu fecha com Escape', () => {
+    mount()
+    press(columnHandle(0))
+    expect(document.querySelector('.menu')).not.toBeNull()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(document.querySelector('.menu')).toBeNull()
+  })
+
+  it('o menu fecha ao apertar fora dele', () => {
+    mount()
+    press(columnHandle(0))
+    window.dispatchEvent(new Event('pointerdown'))
+    expect(document.querySelector('.menu')).toBeNull()
   })
 })

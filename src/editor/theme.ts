@@ -282,7 +282,8 @@ export const editorTheme = EditorView.theme({
   // Tables, drawn as a grid and edited inside it.
   '.cm-md-table-wrap': {
     position: 'relative',
-    margin: '0.4em 20px 1.4em',
+    margin: '0.2em 20px 1.4em',
+    paddingTop: '9px',
     overflowX: 'auto',
     fontFamily: 'var(--font-ui)',
   },
@@ -298,8 +299,8 @@ export const editorTheme = EditorView.theme({
   '.cm-md-table': {
     // Natural column widths, but never narrower than the column of text.
     width: 'auto',
-    minWidth: 'calc(100% - 22px)',
-    marginLeft: '22px',
+    minWidth: 'calc(100% - 9px)',
+    marginLeft: '9px',
     borderCollapse: 'separate',
     borderSpacing: '0',
     border: '1px solid var(--border-subtle)',
@@ -337,53 +338,24 @@ export const editorTheme = EditorView.theme({
     boxShadow: 'inset 0 0 0 1px var(--accent)',
   },
 
-  // The buttons: out of the way until the pointer is on the table.
-  '.cm-md-table-gutter': {
-    width: '22px',
-    padding: '0',
-    border: '0',
-    verticalAlign: 'middle',
-    whiteSpace: 'nowrap',
-  },
-  '.cm-md-col-tools': {
+  // The handles: thin bars on the edge of the table, the way a spreadsheet
+  // does it. They are always in the layout and only ever change colour, so
+  // nothing on the page moves when the pointer arrives.
+  '.cm-md-col-handle, .cm-md-row-handle': {
     position: 'absolute',
-    top: '2px',
-    right: '2px',
-    display: 'none',
-    gap: '1px',
-  },
-  '.cm-md-table-gutter .cm-md-table-button': { display: 'none' },
-  '.cm-md-table-wrap:hover .cm-md-col-tools': { display: 'flex' },
-  '.cm-md-table-wrap:hover .cm-md-table-gutter .cm-md-table-button': { display: 'inline-flex' },
-
-  '.cm-md-table-button': {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: '16px',
-    height: '16px',
-    padding: '0 3px',
-    border: '1px solid var(--border-default)',
-    borderRadius: '4px',
-    background: 'var(--bg-content)',
-    color: 'var(--text-tertiary)',
-    fontFamily: 'var(--font-ui)',
-    fontSize: '10px',
-    lineHeight: '1',
+    background: 'transparent',
+    borderRadius: '2px',
     cursor: 'pointer',
+    transition: 'background 90ms ease',
   },
-  '.cm-md-table-button:hover': {
-    borderColor: 'var(--accent)',
-    color: 'var(--accent-text)',
+  '.cm-md-col-handle': { top: '-7px', left: '-1px', right: '-1px', height: '4px' },
+  '.cm-md-row-handle': { left: '-7px', top: '-1px', bottom: '-1px', width: '4px' },
+  '.cm-md-table-wrap:hover .cm-md-col-handle, .cm-md-table-wrap:hover .cm-md-row-handle': {
+    background: 'var(--border-emphasis)',
   },
-
-  '.cm-md-table-foot': {
-    display: 'none',
-    gap: '4px',
-    marginTop: '4px',
-    marginLeft: '22px',
+  '.cm-md-table-wrap .cm-md-col-handle:hover, .cm-md-table-wrap .cm-md-row-handle:hover': {
+    background: 'var(--accent)',
   },
-  '.cm-md-table-wrap:hover .cm-md-table-foot': { display: 'flex' },
 })
 
 export const markdownHighlight = syntaxHighlighting(
