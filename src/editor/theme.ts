@@ -279,40 +279,111 @@ export const editorTheme = EditorView.theme({
   },
   '.cm-md-footnote-def.is-first': { marginTop: '0.5em' },
 
-  // Tables, drawn as a grid while the cursor is elsewhere.
-  '.cm-md-table-wrap': { margin: '0.4em 20px 1.4em', overflowX: 'auto' },
+  // Tables, drawn as a grid and edited inside it.
+  '.cm-md-table-wrap': {
+    position: 'relative',
+    margin: '0.4em 20px 1.4em',
+    overflowX: 'auto',
+    fontFamily: 'var(--font-ui)',
+  },
+  '.cm-md-table-wrap.is-raw': {
+    padding: '10px 14px',
+    border: '1px dashed var(--border-emphasis)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-tertiary)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.82em',
+    whiteSpace: 'pre',
+  },
   '.cm-md-table': {
     // Natural column widths, but never narrower than the column of text.
     width: 'auto',
-    minWidth: '100%',
+    minWidth: 'calc(100% - 22px)',
+    marginLeft: '22px',
     borderCollapse: 'separate',
     borderSpacing: '0',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-md)',
-    fontFamily: 'var(--font-ui)',
     fontSize: '0.8em',
   },
-  '.cm-md-table th, .cm-md-table td': {
-    padding: '7px 12px',
+  '.cm-md-cell': {
+    position: 'relative',
+    padding: '0',
     borderBottom: '1px solid var(--border-subtle)',
     verticalAlign: 'top',
+  },
+  '.cm-md-cell + .cm-md-cell': { borderLeft: '1px solid var(--border-subtle)' },
+  '.cm-md-table tbody tr:last-child .cm-md-cell': { borderBottom: '0' },
+  '.cm-md-table th.cm-md-cell': {
+    background: 'var(--surface-1)',
+    color: 'var(--text-primary)',
+    fontWeight: '580',
+  },
+  '.cm-md-table td.cm-md-cell': { color: 'var(--text-secondary)' },
+
+  '.cm-md-cell-text': {
+    minWidth: '3.5em',
+    minHeight: '1.2em',
+    padding: '7px 12px',
+    outline: 'none',
 
     // The editor breaks long words to keep prose inside the column. A table
     // cell that does the same reads as a typo.
     overflowWrap: 'normal',
     wordBreak: 'normal',
   },
-  '.cm-md-table th + th, .cm-md-table td + td': {
-    borderLeft: '1px solid var(--border-subtle)',
+  '.cm-md-cell-text:focus': {
+    background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+    boxShadow: 'inset 0 0 0 1px var(--accent)',
   },
-  '.cm-md-table tbody tr:last-child td': { borderBottom: '0' },
-  '.cm-md-table thead th': {
-    background: 'var(--surface-1)',
-    color: 'var(--text-primary)',
-    fontWeight: '580',
-    textAlign: 'left',
+
+  // The buttons: out of the way until the pointer is on the table.
+  '.cm-md-table-gutter': {
+    width: '22px',
+    padding: '0',
+    border: '0',
+    verticalAlign: 'middle',
+    whiteSpace: 'nowrap',
   },
-  '.cm-md-table td': { color: 'var(--text-secondary)' },
+  '.cm-md-col-tools': {
+    position: 'absolute',
+    top: '2px',
+    right: '2px',
+    display: 'none',
+    gap: '1px',
+  },
+  '.cm-md-table-gutter .cm-md-table-button': { display: 'none' },
+  '.cm-md-table-wrap:hover .cm-md-col-tools': { display: 'flex' },
+  '.cm-md-table-wrap:hover .cm-md-table-gutter .cm-md-table-button': { display: 'inline-flex' },
+
+  '.cm-md-table-button': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '16px',
+    height: '16px',
+    padding: '0 3px',
+    border: '1px solid var(--border-default)',
+    borderRadius: '4px',
+    background: 'var(--bg-content)',
+    color: 'var(--text-tertiary)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '10px',
+    lineHeight: '1',
+    cursor: 'pointer',
+  },
+  '.cm-md-table-button:hover': {
+    borderColor: 'var(--accent)',
+    color: 'var(--accent-text)',
+  },
+
+  '.cm-md-table-foot': {
+    display: 'none',
+    gap: '4px',
+    marginTop: '4px',
+    marginLeft: '22px',
+  },
+  '.cm-md-table-wrap:hover .cm-md-table-foot': { display: 'flex' },
 })
 
 export const markdownHighlight = syntaxHighlighting(

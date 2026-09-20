@@ -1,59 +1,54 @@
 import { describe, expect, it } from 'vitest'
-import { markdown } from '@codemirror/lang-markdown'
-import { ensureSyntaxTree } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
-import { dialect } from './dialect'
-import { parseTable, tableBlocks } from './tables'
+import { tableBlocks, tableBlocksField } from './tables'
 
-const TABLE = ['| Coluna | Nota |', '|---|:---:|', '| um | 1 |', '| dois | 2 |'].join('\n')
+const TABLE = ['| Coluna | Nota |', '|---|:-:|', '| um | 1 |', '| dois | 2 |'].join('\n')
 
 function state(doc: string, cursor = 0): EditorState {
-  const created = EditorState.create({
-    doc,
-    selection: { anchor: cursor },
-    extensions: [markdown({ extensions: dialect }), tableBlocks],
-  })
-  // The tree is what the field reads, so it has to exist before we look.
-  ensureSyntaxTree(created, doc.length, 5000)
-  return created
+  return EditorState.create({ doc, selection: { anchor: cursor }, extensions: [tableBlocks] })
 }
 
-describe('parseTable', () => {
-  it('lê cabeçalho, corpo e alinhamento', () => {
-    const parsed = parseTable(state(TABLE), 0, TABLE.length)
-    expect(parsed.header?.cells.map((cell) => cell.text.trim())).toEqual(['Coluna', 'Nota'])
-    expect(parsed.align).toEqual(['left', 'center'])
-    expect(parsed.body.map((row) => row.cells.map((cell) => cell.text.trim()))).toEqual([
-      ['um', '1'],
-      ['dois', '2'],
-    ])
+const found = (doc: string) => state(doc).field(tableBlocksField).tables
+
+describe('encontrar tabelas', () => {
+  it('acha uma tabela solta', () => {
+    expect(found(TABLE)).toHaveLength(1)
   })
 
-  it('guarda onde cada célula começa, que é o que o clique usa', () => {
-    const parsed = parseTable(state(TABLE), 0, TABLE.length)
-    const first = parsed.header!.cells[0]!
-    expect(TABLE.slice(first.from, first.from + first.text.length)).toBe(first.text)
+  it('acha as duas quando há duas', () => {
+    expect(found(TABLE + '\n\ntexto no meio\n\n' + TABLE)).toHaveLength(2)
   })
 
-  it('não se perde com uma barra escapada dentro da célula', () => {
-    const doc = '| a \\| b | c |\n|---|---|\n| 1 | 2 |'
-    const parsed = parseTable(state(doc), 0, doc.length)
-    expect(parsed.header?.cells).toHaveLength(2)
+  it('não confunde uma linha com barra com uma tabela', () => {
+    expect(found('| isto não tem traços embaixo |\ntexto comum')).toHaveLength(0)
+  })
+
+  it('exige o mesmo número de colunas na linha de traços', () => {
+    expect(found('| a | b |\n|---|\n| 1 | 2 |')).toHaveLength(0)
+  })
+
+  it('ignora tabela dentro de bloco de código', () => {
+    expect(found('```\n' + TABLE + '\n```\n')).toHaveLength(0)
+  })
+
+  it('volta a achar depois que a cerca fecha', () => {
+    expect(found('```\nnada\n```\n\n' + TABLE)).toHaveLength(1)
+  })
+
+  it('acha uma tabela que o analisador ainda não alcançou', () => {
+    // Um documento longo o bastante para a árvore de sintaxe ficar incompleta,
+    // que era o que deixava trinta das cinquenta e três tabelas como texto.
+    const enchimento = Array.from({ length: 4000 }, (_, i) => 'Parágrafo ' + i + '.').join('\n\n')
+    expect(found(enchimento + '\n\n' + TABLE)).toHaveLength(1)
   })
 })
 
-describe('tableBlocks', () => {
-  const drawn = (cursor: number) => state(TABLE + '\n\ndepois\n', cursor).field(tableBlocks)
-
-  it('desenha a grade quando o cursor está longe', () => {
-    expect(drawn(TABLE.length + 4).decorations.size).toBe(1)
+describe('desenhar tabelas', () => {
+  it('desenha a grade mesmo com o cursor dentro', () => {
+    expect(state(TABLE, 5).field(tableBlocksField).decorations.size).toBe(1)
   })
 
-  it('devolve o texto quando o cursor entra na tabela', () => {
-    expect(drawn(5).decorations.size).toBe(0)
-  })
-
-  it('guarda onde estão as tabelas para não varrer a árvore a cada tecla', () => {
-    expect(drawn(TABLE.length + 4).tables).toHaveLength(1)
+  it('desenha num documento sem tabela nenhuma', () => {
+    expect(state('só texto').field(tableBlocksField).decorations.size).toBe(0)
   })
 })
