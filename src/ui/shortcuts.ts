@@ -79,6 +79,21 @@ export function keyCap(shortcut: Shortcut, apple = onApple()): string {
   return [...parts, key].join('+')
 }
 
+/**
+ * The same binding written the way the native menu wants it, so that what the
+ * menu shows and what the app answers to come from one place.
+ */
+export function accelerator(shortcut: Shortcut): string {
+  const parts = []
+  if (shortcut.control) parts.push('Ctrl')
+  if (shortcut.mod) parts.push('CmdOrCtrl')
+  if (shortcut.alt) parts.push('Alt')
+  if (shortcut.shift) parts.push('Shift')
+  const NAMES: Record<string, string> = { '=': 'Plus', ',': 'Comma', '\\': 'Backslash' }
+  parts.push(NAMES[shortcut.key] ?? shortcut.key.toUpperCase())
+  return parts.join('+')
+}
+
 interface Pressed {
   key: string
   metaKey: boolean

@@ -4,17 +4,29 @@ import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { baseName, entryId, parentPath, type Entry } from '~/platform/fs'
 import type { Heading } from '~/editor/outline'
-import { EditorView } from '@codemirror/view'
+import { EditorView, type Command } from '@codemirror/view'
+import { redo, undo } from '@codemirror/commands'
+import { openSearchPanel } from '@codemirror/search'
+import {
+  insertLink,
+  toggleBold,
+  toggleCode,
+  toggleHighlight,
+  toggleItalic,
+  toggleStrike,
+  toggleTask,
+} from '~/editor/commands'
 import { exportDocument } from '~/editor/export-html'
 import { exportPdf } from '~/editor/export-pdf'
-import { fileSystem, platform } from '~/platform'
+import { fileSystem, isDesktop, platform } from '~/platform'
 import { onOpenedPaths } from '~/platform/opened'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { Dialog, type DialogChoice } from './Dialog'
-import { matchShortcut } from './shortcuts'
+import { matchShortcut, onApple } from './shortcuts'
+import { installAppMenu, menuPlan, type CommandId } from './app-menu'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { InfoPanel } from './InfoPanel'
 import { MeasureGuides } from './MeasureGuides'
@@ -514,91 +526,165 @@ export function App() {
     [settings.uiScale, update],
   )
 
+  /**
+   * Runs a command once, even when two paths ask for it.
+   *
+   * The native menu and the keyboard both claim the same keys, and which one
+   * swallows a press is the system's business, not ours. A second identical
+   * request inside a blink is the same request arriving twice.
+   */
+  const lastRun = useRef<Map<string, number>>(new Map())
+  const once = useCallback((key: string, act: () => void) => {
+    const now = Date.now()
+    if (now - (lastRun.current.get(key) ?? 0) < 120) return
+    lastRun.current.set(key, now)
+    act()
+  }, [])
+
+  const runCommand = useCallback(
+    (hit: CommandId) => {
+      const { activeId, tabs, bases, recents } = latestState.current
+      const view = editor.current
+
+      if (typeof hit === 'object') {
+        if ('tab' in hit) {
+          const tab: Tab | undefined = tabs[hit.tab - 1]
+          if (tab) actions.activateTab(tab.id)
+          return
+        }
+        if ('recentFile' in hit) {
+          const file = recents.files[hit.recentFile]
+          if (file) void actions.openRecentFile(file)
+          return
+        }
+        const base = recents.bases[hit.recentBase]
+        if (base) void actions.openRecentBase(base)
+        return
+      }
+
+      const editorCommands: Partial<Record<string, Command>> = {
+        undo,
+        redo,
+        find: openSearchPanel,
+        bold: toggleBold,
+        italic: toggleItalic,
+        code: toggleCode,
+        link: insertLink,
+        strike: toggleStrike,
+        highlight: toggleHighlight,
+        task: toggleTask,
+      }
+      const command = editorCommands[hit]
+      if (command) {
+        if (!view) return
+        once(hit, () => {
+          view.focus()
+          command(view)
+        })
+        return
+      }
+
+      once(hit, () => {
+        switch (hit) {
+          case 'save':
+            // Saving works wherever the focus is, including inside a table.
+            if (activeId) void actions.save(activeId)
+            break
+          case 'newFile': {
+            const base = tabs.find((tab: Tab) => tab.id === activeId)?.baseId ?? bases[0]?.id
+            if (!base) return
+            const parent = parentPath(tabs.find((tab: Tab) => tab.id === activeId)?.path ?? '')
+            void createIn(base, parent, 'file')
+            break
+          }
+          case 'openBase':
+            void actions.openBase()
+            break
+          case 'openFile':
+            void actions.openLooseFile()
+            break
+          case 'closeTab':
+            if (activeId) closeTab(activeId)
+            break
+          case 'reopenTab':
+            reopenTab()
+            break
+          case 'nextTab':
+            stepTab(1)
+            break
+          case 'previousTab':
+            stepTab(-1)
+            break
+          case 'toggleSidebar':
+            setSidebarOpen((open) => !open)
+            break
+          case 'toggleInfo':
+            update('infoPanel', !settings.infoPanel)
+            break
+          case 'settings':
+            setSettingsOpen((open) => !open)
+            break
+          case 'print': {
+            // The browser would otherwise print the interface itself.
+            if (!activeId) return
+            const printing = documentMenu().find((entry) => entry.label.startsWith('Imprimir'))
+            printing?.onSelect()
+            break
+          }
+          case 'zoomIn':
+            zoom(1)
+            break
+          case 'zoomOut':
+            zoom(-1)
+            break
+          case 'zoomReset':
+            zoom(null)
+            break
+        }
+      })
+    },
+    [
+      actions,
+      closeTab,
+      createIn,
+      documentMenu,
+      once,
+      reopenTab,
+      settings.infoPanel,
+      stepTab,
+      update,
+      zoom,
+    ],
+  )
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const hit = matchShortcut(event)
       if (hit === null) return
-      const { activeId, tabs, bases } = latestState.current
-
-      if (typeof hit === 'object') {
-        const tab: Tab | undefined = tabs[hit.tab - 1]
-        if (!tab) return
-        event.preventDefault()
-        actions.activateTab(tab.id)
-        return
-      }
-
-      switch (hit) {
-        case 'save':
-          // Saving works wherever the focus is, including inside a table.
-          if (activeId) void actions.save(activeId)
-          break
-        case 'newFile': {
-          const base = tabs.find((tab: Tab) => tab.id === activeId)?.baseId ?? bases[0]?.id
-          if (!base) return
-          const parent = parentPath(tabs.find((tab: Tab) => tab.id === activeId)?.path ?? '')
-          void createIn(base, parent, 'file')
-          break
-        }
-        case 'openBase':
-          void actions.openBase()
-          break
-        case 'openFile':
-          void actions.openLooseFile()
-          break
-        case 'closeTab':
-          if (activeId) closeTab(activeId)
-          break
-        case 'reopenTab':
-          reopenTab()
-          break
-        case 'nextTab':
-          stepTab(1)
-          break
-        case 'previousTab':
-          stepTab(-1)
-          break
-        case 'toggleSidebar':
-          setSidebarOpen((open) => !open)
-          break
-        case 'toggleInfo':
-          update('infoPanel', !settings.infoPanel)
-          break
-        case 'settings':
-          setSettingsOpen((open) => !open)
-          break
-        case 'print': {
-          // The browser would otherwise print the interface itself.
-          if (!activeId) return
-          const item = documentMenu().find((entry) => entry.label.startsWith('Imprimir'))
-          item?.onSelect()
-          break
-        }
-        case 'zoomIn':
-          zoom(1)
-          break
-        case 'zoomOut':
-          zoom(-1)
-          break
-        case 'zoomReset':
-          zoom(null)
-          break
-      }
       event.preventDefault()
+      runCommand(hit)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [
-    actions,
-    closeTab,
-    createIn,
-    documentMenu,
-    reopenTab,
-    settings.infoPanel,
-    stepTab,
-    update,
-    zoom,
-  ])
+  }, [runCommand])
+
+  // The menu the system draws. It is rebuilt when what it offers changes, not
+  // on every keystroke: the whole tree crosses to the other side each time.
+  const latestRun = useRef(runCommand)
+  useEffect(() => {
+    // oxlint-disable-next-line immutability
+    latestRun.current = runCommand
+  })
+  const hasDocument = state.tabs.length > 0
+  useEffect(() => {
+    if (!isDesktop()) return
+    void installAppMenu(menuPlan({ recents: state.recents, hasDocument, apple: onApple() }), (
+      command,
+    ) => latestRun.current(command))
+      // A menu that did not install leaves the app usable by keyboard, so it
+      // is worth a line in the console and not an interruption.
+      .catch((error: unknown) => console.error('menu do sistema:', error))
+  }, [state.recents, hasDocument])
 
   const dark = theme === 'dark'
 
