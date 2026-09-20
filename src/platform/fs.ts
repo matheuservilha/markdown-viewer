@@ -79,6 +79,11 @@ export interface FileSystem {
   read(baseId: string, path: string): Promise<LoadedFile>
   /** The raw bytes, for the files that are not text: images and the like. */
   readBinary(baseId: string, path: string): Promise<Uint8Array>
+  /**
+   * Writes a throwaway file and hands it to the system. It exists because the
+   * desktop web view cannot print: the document goes out to the browser.
+   */
+  openTemporary(name: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>
   /** Asks where to put a new file and writes it. Null when nobody chose. */
   saveAs(suggestedName: string, bytes: Uint8Array<ArrayBuffer>): Promise<string | null>
 

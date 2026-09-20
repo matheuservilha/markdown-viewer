@@ -84,15 +84,42 @@ function renderTable(node: SyntaxNode, context: Context): string {
   return out + '</table>'
 }
 
-function renderQuote(node: SyntaxNode, context: Context): string {
-  const first = context.text.slice(node.from, node.to).split('\n')[0] ?? ''
-  const callout = parseCallout(first)
-  const inner = children(node, context, new Set(['QuoteMark']))
+/** Renders a piece of Markdown on its own, sharing the image list. */
+function renderFragment(text: string, context: Context): string {
+  return render(parser.parse(text).topNode, { text, images: context.images })
+}
 
-  if (!callout) return '<blockquote>' + inner + '</blockquote>'
-  // The marker itself is chrome; the title after it is content.
-  const body = inner.replace(/\[!(\w+)\]([+-]?)\s?/, '')
-  return '<div class="callout callout-' + callout.type + '">' + body + '</div>'
+const QUOTE_PREFIX = /^\s{0,3}>\s?/
+const CALLOUT_MARKER = /^\[!\w+\][+-]?\s*/
+
+/**
+ * A quote is rendered from its text with the `>` taken off, rather than from
+ * its nodes. The markers sit inside the paragraphs of a multi-line quote, and
+ * `[!tip]` is parsed as a link reference, so cleaning the HTML afterwards
+ * fights the parser instead of using it.
+ */
+function renderQuote(node: SyntaxNode, context: Context): string {
+  const raw = context.text.slice(node.from, node.to)
+  const callout = parseCallout(raw.split('\n')[0] ?? '')
+  const lines = raw.split('\n').map((line) => line.replace(QUOTE_PREFIX, ''))
+
+  if (!callout) {
+    return '<blockquote>' + renderFragment(lines.join('\n'), context) + '</blockquote>'
+  }
+
+  const title = (lines[0] ?? '').replace(CALLOUT_MARKER, '')
+  const body = lines.slice(1).join('\n').trim()
+
+  return (
+    '<div class="callout callout-' +
+    callout.type +
+    '">' +
+    (title === ''
+      ? ''
+      : renderFragment(title, context).replace(/^<p>/, '<p class="callout-title">')) +
+    (body === '' ? '' : renderFragment(body, context)) +
+    '</div>'
+  )
 }
 
 function render(node: SyntaxNode, context: Context): string {
@@ -116,7 +143,11 @@ function render(node: SyntaxNode, context: Context): string {
     case 'ListItem':
       return '<li>' + children(node, context, LIST_MARKS).trim() + '</li>'
     case 'TaskMarker':
-      return '<input type="checkbox" disabled' + (/\[[xX]\]/.test(raw()) ? ' checked' : '') + '> '
+      // Drawn as a character rather than a form control: an <input> rasterises
+      // badly into a PDF, and most printers drop its tick altogether.
+      return /\[[xX]\]/.test(raw())
+        ? '<span class="task is-done">✓</span>'
+        : '<span class="task"></span>'
     case 'FencedCode':
     case 'CodeBlock': {
       const lines = raw().split('\n')
@@ -126,6 +157,10 @@ function render(node: SyntaxNode, context: Context): string {
       const tag = language ? '<code class="language-' + escape(language) + '">' : '<code>'
       return '<pre>' + tag + escape(body) + '</code></pre>'
     }
+    case 'QuoteMark':
+      // Reached only through a nested quote, where the outer one has already
+      // taken its own markers off.
+      return ''
     case 'HorizontalRule':
       return '<hr>'
     case 'Table':
@@ -240,19 +275,29 @@ export async function renderMarkdown(text: string, source: Source | null): Promi
   return embedImages(html, context.images, source)
 }
 
+export interface ExportOptions {
+  /**
+   * `auto` follows the reader's system. `light` pins the page to the light
+   * palette, which is what a PDF needs: paper is white everywhere.
+   */
+  theme?: 'auto' | 'light'
+}
+
 export async function exportDocument(
   title: string,
   text: string,
   source: Source | null,
+  options: ExportOptions = {},
 ): Promise<string> {
   const body = await renderMarkdown(text, source)
+  const style = options.theme === 'light' ? STYLE.replace(DARK_BLOCK, '') : STYLE
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)}</title>
-<style>${STYLE}</style>
+<style>${style}</style>
 </head>
 <body>
 <article>
@@ -264,21 +309,29 @@ ${body}
 `
 }
 
+const DARK_BLOCK = `@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14141d; --text: #eceaf2; --dim: #a4a1b4; --faint: #7a7788;
+    --accent: #ff8461; --border: #2b2a3b; --code-bg: #1c1b28;
+    --blue: #7f9fe0; --teal: #5fbfbd; --green: #7fc08f; --yellow: #ddc06a;
+    --orange: #e09a5f; --red: #e08080; --purple: #b39ae8; --faint-tone: #7a7788;
+    --blue-soft: #1d2434; --teal-soft: #152826; --green-soft: #17271b;
+    --yellow-soft: #2a2417; --orange-soft: #2b2016; --red-soft: #2c1b1a;
+    --purple-soft: #241d33; --faint-soft: #1f1e2a; --mark: #4a3f1c;
+  }
+}`
+
 const STYLE = `
 :root {
   --bg: #ffffff; --text: #16151d; --dim: #56545f; --faint: #85828f;
   --accent: #c2410c; --border: #e3e3ea; --code-bg: #f4f4f8;
   --blue: #2f6ab8; --teal: #17797a; --green: #2c7a46; --yellow: #8a6a15;
-  --orange: #ab6318; --red: #b3382f; --purple: #6b3fa0;
+  --orange: #ab6318; --red: #b3382f; --purple: #6b3fa0; --faint-tone: #85828f;
+  --blue-soft: #eaf1fb; --teal-soft: #e3f3f3; --green-soft: #e6f4ea;
+  --yellow-soft: #f8f1dd; --orange-soft: #fbeee1; --red-soft: #fbe9e7;
+  --purple-soft: #f0e9fa; --faint-soft: #f2f2f6; --mark: #fdeeb8;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #14141d; --text: #eceaf2; --dim: #a4a1b4; --faint: #7a7788;
-    --accent: #ff8461; --border: #2b2a3b; --code-bg: #1c1b28;
-    --blue: #7f9fe0; --teal: #5fbfbd; --green: #7fc08f; --yellow: #ddc06a;
-    --orange: #e09a5f; --red: #e08080; --purple: #b39ae8;
-  }
-}
+${DARK_BLOCK}
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
@@ -294,7 +347,7 @@ h3 { font-size: 1.15rem; margin-top: 1.6rem; }
 p, ul, ol, blockquote, pre, table { margin: 0 0 1.1rem; }
 a { color: var(--accent); }
 .wikilink { color: var(--accent); }
-mark { background: color-mix(in srgb, var(--yellow) 30%, transparent); color: inherit; }
+mark { background: var(--mark); color: inherit; }
 del { color: var(--faint); }
 code {
   padding: 0.1em 0.3em; border-radius: 4px; background: var(--code-bg);
@@ -309,23 +362,33 @@ blockquote {
 .callout {
   padding: 0.7rem 1.1rem; border-left: 2px solid var(--tone, var(--blue));
   border-radius: 0 8px 8px 0; margin: 0 0 1.1rem;
-  background: color-mix(in srgb, var(--tone, var(--blue)) 8%, transparent);
+  background: var(--tone-soft, var(--blue-soft));
 }
-.callout > :first-child { font-weight: 620; color: var(--tone, var(--blue)); }
+.callout-title { font-weight: 620; color: var(--tone, var(--blue)); }
 .callout > :last-child { margin-bottom: 0; }
-.callout-note { --tone: var(--blue); } .callout-abstract { --tone: var(--teal); }
-.callout-tip, .callout-success { --tone: var(--green); }
-.callout-question { --tone: var(--yellow); } .callout-important, .callout-example { --tone: var(--purple); }
-.callout-warning { --tone: var(--orange); }
-.callout-caution, .callout-failure, .callout-bug { --tone: var(--red); }
-.callout-quote { --tone: var(--faint); }
+.callout-note { --tone: var(--blue); --tone-soft: var(--blue-soft); }
+.callout-abstract { --tone: var(--teal); --tone-soft: var(--teal-soft); }
+.callout-tip, .callout-success { --tone: var(--green); --tone-soft: var(--green-soft); }
+.callout-question { --tone: var(--yellow); --tone-soft: var(--yellow-soft); }
+.callout-important, .callout-example { --tone: var(--purple); --tone-soft: var(--purple-soft); }
+.callout-warning { --tone: var(--orange); --tone-soft: var(--orange-soft); }
+.callout-caution, .callout-failure, .callout-bug { --tone: var(--red); --tone-soft: var(--red-soft); }
+.callout-quote { --tone: var(--faint-tone); --tone-soft: var(--faint-soft); }
 table { border-collapse: collapse; width: 100%; font-size: 0.92em; }
 th, td { padding: 0.45rem 0.7rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
 th { background: var(--code-bg); font-weight: 600; }
 img { max-width: 100%; height: auto; border-radius: 8px; }
 hr { height: 1px; border: 0; background: var(--border); margin: 2rem 0; }
 sup.footnote { color: var(--accent); font-size: 0.75em; }
-input[type=checkbox] { accent-color: var(--accent); margin-right: 0.35em; }
+li > p { margin: 0; }
+li { margin-bottom: 0.2rem; }
+li:has(> .task) { list-style: none; margin-left: -1.1rem; }
+.task {
+  display: inline-block; width: 0.95em; height: 0.95em; margin-right: 0.45em;
+  border: 1.5px solid var(--faint-tone); border-radius: 3px;
+  font-size: 0.8em; line-height: 0.9em; text-align: center; vertical-align: -0.1em;
+}
+.task.is-done { border-color: var(--accent); background: var(--accent); color: #fff; }
 @media print {
   :root { --bg: #fff; --text: #111; }
   article { max-width: none; padding: 0; }

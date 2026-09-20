@@ -1046,6 +1046,29 @@ a:focus-visible,
 
 /* ---------------------------------------------------------------- toast */
 
+.toast.is-busy {
+  color: var(--text-secondary);
+}
+
+.busy-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: busy-pulse 1s ease-in-out infinite;
+}
+
+@keyframes busy-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 .toast {
   position: fixed;
   right: 1.25rem;

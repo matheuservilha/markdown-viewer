@@ -8,6 +8,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
+import { tempDir } from '@tauri-apps/api/path'
 import {
   copyFile,
   mkdir,
@@ -114,6 +115,13 @@ export class TauriFileSystem implements FileSystem {
 
   async readBinary(baseId: string, path: string): Promise<Uint8Array> {
     return readFile(this.absolute(baseId, path))
+  }
+
+  async openTemporary(name: string, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+    const path = (await tempDir()).replace(/\/$/, '') + '/' + name
+    await invoke('allow_base', { path })
+    await writeFile(path, bytes)
+    await invoke('open_path', { path })
   }
 
   async saveAs(suggestedName: string, bytes: Uint8Array<ArrayBuffer>): Promise<string | null> {

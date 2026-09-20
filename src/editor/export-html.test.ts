@@ -24,7 +24,7 @@ describe('renderMarkdown', () => {
   it('writes a list, and a task as a checkbox', async () => {
     const out = await html('- um\n- [x] feito\n')
     expect(out).toContain('<ul>')
-    expect(out).toContain('<input type="checkbox" disabled checked>')
+    expect(out).toContain('<span class="task is-done">')
   })
 
   it('keeps a code block as text, with its language', async () => {

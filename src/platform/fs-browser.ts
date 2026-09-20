@@ -181,6 +181,10 @@ export class BrowserFileSystem implements FileSystem {
     return new Uint8Array(await file.arrayBuffer())
   }
 
+  async openTemporary(): Promise<void> {
+    throw new Error('O navegador imprime direto, sem passar por arquivo.')
+  }
+
   async saveAs(suggestedName: string, bytes: Uint8Array<ArrayBuffer>): Promise<string | null> {
     if (!('showSaveFilePicker' in window)) {
       // Without the picker the browser can still hand the file to the person

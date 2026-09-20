@@ -232,6 +232,10 @@ export class MemoryFileSystem implements FileSystem {
     return new TextEncoder().encode(this.require(baseId, path).text)
   }
 
+  async openTemporary(): Promise<void> {
+    throw new Error('Não há sistema de arquivos atrás de uma pasta em memória.')
+  }
+
   async saveAs(): Promise<string | null> {
     // Nothing in memory has a place on disk to be saved to.
     return null

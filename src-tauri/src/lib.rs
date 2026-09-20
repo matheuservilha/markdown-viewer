@@ -54,12 +54,31 @@ fn reveal_in_file_manager(path: String) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+/// Hands a file to whatever the system opens that kind of file with.
+#[tauri::command]
+fn open_path(path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    #[cfg(target_os = "macos")]
+    let program = "open";
+    #[cfg(target_os = "windows")]
+    let program = "explorer";
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let program = "xdg-open";
+
+    Command::new(program)
+        .arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![allow_base, move_to_trash, reveal_in_file_manager])
+        .invoke_handler(tauri::generate_handler![allow_base, move_to_trash, reveal_in_file_manager, open_path])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

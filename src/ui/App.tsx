@@ -13,7 +13,8 @@ import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { MeasureGuides } from './MeasureGuides'
 import { SettingsWindow } from './SettingsWindow'
 import { SidebarResizer } from './SidebarResizer'
-import { printHtml } from './print'
+import { htmlToPdf } from './pdf'
+import { canPrint, printHtml } from './print'
 import { StatusBar } from './StatusBar'
 import { Tabs } from './Tabs'
 import {
@@ -47,6 +48,8 @@ export function App() {
   const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number } | null>(null)
   const restore = actions.restoreSession
   const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   // Only the four slices the tree reads, so that typing in a document does not
   // invalidate it.
@@ -171,25 +174,38 @@ export function App() {
       kind: 'file' as const,
     }
     const copy = (text: string) => void navigator.clipboard.writeText(text)
-    const html = () => exportDocument(tab.name.replace(/\.[^.]+$/, ''), doc.text, source)
+    const stem = tab.name.replace(/\.[^.]+$/, '')
+    const html = (palette: 'auto' | 'light') =>
+      exportDocument(stem, doc.text, source, { theme: palette })
 
     return [
       {
         label: 'Exportar HTML',
         onSelect: () => {
-          void html().then((page) =>
-            files.saveAs(
-              tab.name.replace(/\.[^.]+$/, '') + '.html',
-              new TextEncoder().encode(page),
-            ),
+          void html('auto').then((page) =>
+            files.saveAs(stem + '.html', new TextEncoder().encode(page)),
           )
         },
       },
       {
-        label: 'Imprimir ou salvar PDF',
+        // Built inside the app rather than handed to a print dialog, so the
+        // file comes out the same on every platform, and always on white paper.
+        label: 'Exportar PDF',
         hint: '⌘P',
-        onSelect: () => void html().then(printHtml),
+        onSelect: () => {
+          setBusy('Gerando o PDF')
+          void html('light')
+            .then((page) => htmlToPdf(page))
+            .then((bytes) => files.saveAs(stem + '.pdf', bytes))
+            .catch((error: unknown) =>
+              setNotice(error instanceof Error ? error.message : String(error)),
+            )
+            .finally(() => setBusy(null))
+        },
       },
+      ...(canPrint()
+        ? [{ label: 'Imprimir', onSelect: () => void html('light').then(printHtml) }]
+        : []),
       {
         label: 'Copiar caminho',
         separated: true,
@@ -601,6 +617,22 @@ export function App() {
           onReload={() => state.activeId && void actions.reload(state.activeId)}
         />
       </main>
+
+      {busy && (
+        <div className="toast is-busy" role="status">
+          <span className="busy-dot" />
+          {busy}
+        </div>
+      )}
+
+      {notice && (
+        <div className="toast" role="alert">
+          {notice}
+          <button type="button" onClick={() => setNotice(null)}>
+            fechar
+          </button>
+        </div>
+      )}
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
