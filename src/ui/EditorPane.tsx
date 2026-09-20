@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import type { ViewState } from '~/app/session'
 import { isPlainTextTab, type Doc, type Tab } from '~/app/store'
 import { bodyStart } from '~/editor/frontmatter'
+import { outlineOf, sameOutline, type Heading } from '~/editor/outline'
 import { editorExtensions, readOnlyCompartment, readOnlyExtension } from '~/editor/setup'
 
 /** How long the cursor has to sit still before its position is worth storing. */
@@ -22,6 +23,10 @@ interface Props {
   onViewChange: (view: ViewState) => void
   onChange: (text: string) => void
   onSave: () => void
+  /** The headings of the open file, for the panel on the side. */
+  onOutline: (headings: Heading[]) => void
+  /** Hands the live editor out, so the panel can scroll it. */
+  onReady: (view: EditorView | null) => void
 }
 
 export function EditorPane({
@@ -32,13 +37,15 @@ export function EditorPane({
   onViewChange,
   onChange,
   onSave,
+  onOutline,
+  onReady,
 }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   /** Cursor and history per tab, so switching back lands where you left. */
   const parked = useRef(new Map<string, EditorState>())
-  const handlers = useRef({ onChange, onSave, onViewChange })
-  handlers.current = { onChange, onSave, onViewChange }
+  const handlers = useRef({ onChange, onSave, onViewChange, onOutline, onReady })
+  handlers.current = { onChange, onSave, onViewChange, onOutline, onReady }
 
   useEffect(() => {
     const parent = host.current
@@ -56,6 +63,7 @@ export function EditorPane({
       EditorView.updateListener.of((update) => {
         if (update.docChanged) handlers.current.onChange(update.state.doc.toString())
         if (update.docChanged || update.selectionSet) report()
+        if (update.docChanged) publishOutline()
       }),
     ]
 
@@ -92,6 +100,23 @@ export function EditorPane({
       })
     }
 
+    // The tree is parsed in the background, so the first reading comes a beat
+    // after the editor opens, and again whenever the text changes.
+    let headings: Heading[] = []
+    let outlineTimer = 0
+    function publishOutline(): void {
+      window.clearTimeout(outlineTimer)
+      outlineTimer = window.setTimeout(() => {
+        const current = view.current
+        if (!current) return
+        const next = outlineOf(current.state)
+        if (sameOutline(next, headings)) return
+        headings = next
+        handlers.current.onOutline(next)
+      }, 250)
+    }
+    publishOutline()
+
     let timer = 0
     function report(): void {
       window.clearTimeout(timer)
@@ -107,9 +132,12 @@ export function EditorPane({
     }
 
     scroller.addEventListener('scroll', report, { passive: true })
+    handlers.current.onReady(instance)
 
     return () => {
       window.clearTimeout(timer)
+      window.clearTimeout(outlineTimer)
+      handlers.current.onReady(null)
       scroller.removeEventListener('scroll', report)
       const range = instance.state.selection.main
       handlers.current.onViewChange({

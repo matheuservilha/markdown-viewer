@@ -3,6 +3,8 @@ import { loadSession, saveSession, type Session, type ViewState } from '~/app/se
 import { useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, parentPath, type Entry } from '~/platform/fs'
+import type { Heading } from '~/editor/outline'
+import { EditorView } from '@codemirror/view'
 import { exportDocument } from '~/editor/export-html'
 import { exportPdf } from '~/editor/export-pdf'
 import { fileSystem, platform } from '~/platform'
@@ -11,6 +13,7 @@ import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
+import { InfoPanel } from './InfoPanel'
 import { MeasureGuides } from './MeasureGuides'
 import { Recents } from './Recents'
 import { SettingsWindow } from './SettingsWindow'
@@ -27,6 +30,7 @@ import {
   FilePlusIcon,
   FolderPlusIcon,
   MoreIcon,
+  PanelRightIcon,
   MoonIcon,
   SearchIcon,
   SettingsIcon,
@@ -51,6 +55,8 @@ export function App() {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [headings, setHeadings] = useState<Heading[]>([])
+  const editor = useRef<EditorView | null>(null)
 
   // Only the four slices the tree reads, so that typing in a document does not
   // invalidate it.
@@ -349,6 +355,13 @@ export function App() {
     }
   }, [actions, openBases])
 
+  // Reading each folder once, to learn what links to what.
+  useEffect(() => {
+    for (const id of openBases.split(',')) {
+      if (id !== '' && !state.index[id]) void actions.indexBase(id)
+    }
+  }, [actions, openBases, state.index])
+
   // Saving on blur, and looking for changes made behind our back on focus.
   useEffect(() => {
     const onBlur = () => saveActive()
@@ -600,6 +613,18 @@ export function App() {
             {activeDoc && (
               <button
                 type="button"
+                className={'icon-button' + (settings.infoPanel ? ' is-on' : '')}
+                aria-label="Sumário e links"
+                title="Sumário e links"
+                aria-pressed={settings.infoPanel}
+                onClick={() => update('infoPanel', !settings.infoPanel)}
+              >
+                <PanelRightIcon size={16} />
+              </button>
+            )}
+            {activeDoc && (
+              <button
+                type="button"
                 className="icon-button"
                 aria-label="Ações do documento"
                 title="Ações do documento"
@@ -616,19 +641,49 @@ export function App() {
 
         {activeTab && activeDoc ? (
           <>
-            <EditorPane
-              key={activeTab.id}
-              tab={activeTab}
-              doc={activeDoc}
-              readOnly={activeDoc.shape.lossy || settings.readOnly}
-              getInitialView={() => views.current[activeTab.id]}
-              onViewChange={(view) => {
-                views.current = { ...views.current, [activeTab.id]: view }
-                persist()
-              }}
-              onChange={(text) => actions.edit(activeTab.id, text)}
-              onSave={saveActive}
-            />
+            <div className="workspace-body">
+              <EditorPane
+                key={activeTab.id}
+                tab={activeTab}
+                doc={activeDoc}
+                readOnly={activeDoc.shape.lossy || settings.readOnly}
+                getInitialView={() => views.current[activeTab.id]}
+                onViewChange={(view) => {
+                  views.current = { ...views.current, [activeTab.id]: view }
+                  persist()
+                }}
+                onChange={(text) => actions.edit(activeTab.id, text)}
+                onSave={saveActive}
+                onOutline={setHeadings}
+                onReady={(view) => {
+                  editor.current = view
+                }}
+              />
+              {settings.infoPanel && (
+                <InfoPanel
+                  tab={activeTab}
+                  headings={headings}
+                  index={state.index[activeTab.baseId]}
+                  onGoTo={(position) => {
+                    const view = editor.current
+                    if (!view) return
+                    view.dispatch({
+                      selection: { anchor: position },
+                      effects: EditorView.scrollIntoView(position, { y: 'start', yMargin: 24 }),
+                    })
+                    view.focus()
+                  }}
+                  onOpenPath={(baseId, path) =>
+                    void actions.openRecentFile({
+                      baseId,
+                      path,
+                      name: path.slice(path.lastIndexOf('/') + 1),
+                      at: Date.now(),
+                    })
+                  }
+                />
+              )}
+            </div>
           </>
         ) : (
           <EmptyState

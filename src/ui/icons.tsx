@@ -181,3 +181,10 @@ export const ClockIcon = (p: IconProps) => (
     <path d="M12 7.5V12l3 1.8" />
   </Icon>
 )
+
+export const PanelRightIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <path d="M14.5 4.5v15" />
+  </Icon>
+)

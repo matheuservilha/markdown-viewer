@@ -23,6 +23,8 @@ export interface Settings {
   uiScale: number
   /** Width of the file tree, in px. Dragged, not typed. */
   sidebarWidth: number
+  /** Whether the outline and links panel is showing. */
+  infoPanel: boolean
   themeMode: ThemeMode
   readOnly: boolean
 }
@@ -34,6 +36,7 @@ export const DEFAULTS: Settings = {
   bodyFont: 'sans',
   uiScale: 1.12,
   sidebarWidth: 216,
+  infoPanel: false,
   themeMode: 'system',
   readOnly: false,
 }

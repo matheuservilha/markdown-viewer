@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { fileSystem } from '~/platform'
+import { buildIndex, EMPTY_INDEX, type BaseIndex } from './base-index'
 import {
   clearRecents,
   loadRecents,
@@ -57,6 +58,8 @@ export interface State {
   error: string | null
   /** What has been opened before, folders and files. */
   recents: Recents
+  /** Links and titles of each open base, built in the background. */
+  index: Record<string, BaseIndex>
   /** Bases from last session that the browser will only reopen after a click. */
   pending: string[]
   /** False until the attempt to reopen last session has finished. */
@@ -84,6 +87,7 @@ type Action =
   | { type: 'entry/removed'; baseId: string; path: string }
   | { type: 'folders/collapsed' }
   | { type: 'recents/set'; recents: Recents }
+  | { type: 'index/progress'; baseId: string; index: BaseIndex }
 
 const initialState: State = {
   bases: [],
@@ -95,6 +99,7 @@ const initialState: State = {
   filter: '',
   error: null,
   recents: loadRecents(),
+  index: {},
   pending: [],
   restored: false,
 }
@@ -201,6 +206,9 @@ function reducer(state: State, action: Action): State {
 
     case 'session/restored':
       return { ...state, restored: true, pending: action.pending }
+
+    case 'index/progress':
+      return { ...state, index: { ...state.index, [action.baseId]: action.index } }
 
     case 'recents/set':
       return { ...state, recents: action.recents }
@@ -345,7 +353,11 @@ export function useWorkspace() {
       })
       if (latest.current.docs[id]) return
       const loaded = await fileSystem().read(loose.baseId, '')
-      dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false, gone: false } })
+      dispatch({
+        type: 'doc/loaded',
+        id,
+        doc: { ...loaded, dirty: false, conflict: false, gone: false },
+      })
     } catch (error) {
       report(error)
     }
@@ -411,7 +423,11 @@ export function useWorkspace() {
       if (!tab) return
       try {
         const loaded = await fileSystem().read(tab.baseId, tab.path)
-        dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false, gone: false } })
+        dispatch({
+          type: 'doc/loaded',
+          id,
+          doc: { ...loaded, dirty: false, conflict: false, gone: false },
+        })
       } catch (error) {
         report(error)
       }
@@ -569,7 +585,11 @@ export function useWorkspace() {
         dispatch({ type: 'recents/set', recents: rememberFile(file) })
         if (latest.current.docs[id]) return
         const loaded = await fileSystem().read(file.baseId, file.path)
-        dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false, gone: false } })
+        dispatch({
+          type: 'doc/loaded',
+          id,
+          doc: { ...loaded, dirty: false, conflict: false, gone: false },
+        })
       } catch (error) {
         report(error)
       }
@@ -601,33 +621,50 @@ export function useWorkspace() {
    * file changed by another program while the window still has focus, which is
    * the case the focus check never covered.
    */
-  const watchBases = useCallback(
-    (onChange: () => void): (() => void) => {
-      const stops: (() => void)[] = []
-      let cancelled = false
+  const watchBases = useCallback((onChange: () => void): (() => void) => {
+    const stops: (() => void)[] = []
+    let cancelled = false
 
-      for (const base of latest.current.bases) {
-        void fileSystem()
-          .watch(base.id, onChange)
-          .then((stop) => {
-            if (!stop) return
-            if (cancelled) stop()
-            else stops.push(stop)
-          })
-          .catch(() => {
-            // A folder that refuses to be watched is simply not watched.
-          })
-      }
+    for (const base of latest.current.bases) {
+      void fileSystem()
+        .watch(base.id, onChange)
+        .then((stop) => {
+          if (!stop) return
+          if (cancelled) stop()
+          else stops.push(stop)
+        })
+        .catch(() => {
+          // A folder that refuses to be watched is simply not watched.
+        })
+    }
 
-      return () => {
-        cancelled = true
-        for (const stop of stops) stop()
-      }
-    },
-    [],
-  )
+    return () => {
+      cancelled = true
+      for (const stop of stops) stop()
+    }
+  }, [])
 
   const collapseAll = useCallback(() => dispatch({ type: 'folders/collapsed' }), [])
+
+  /**
+   * Reads the whole folder once, in the background, to learn what links to
+   * what. Nothing on screen waits for it: the panel shows how far it got.
+   */
+  const indexing = useRef(new Set<string>())
+  const indexBase = useCallback(async (baseId: string) => {
+    if (indexing.current.has(baseId)) return
+    indexing.current.add(baseId)
+    dispatch({ type: 'index/progress', baseId, index: EMPTY_INDEX })
+    try {
+      await buildIndex(
+        baseId,
+        (index) => dispatch({ type: 'index/progress', baseId, index }),
+        () => false,
+      )
+    } finally {
+      indexing.current.delete(baseId)
+    }
+  }, [])
 
   const forgetRecents = useCallback(
     () => dispatch({ type: 'recents/set', recents: clearRecents() }),
@@ -725,6 +762,7 @@ export function useWorkspace() {
       trashEntry,
       revealEntry,
       collapseAll,
+      indexBase,
       expandFolder,
       revealPath,
       toggleFolder,
@@ -745,6 +783,7 @@ export function useWorkspace() {
       collapseAll,
       createEntry,
       forgetRecents,
+      indexBase,
       expandFolder,
       revealPath,
       duplicateEntry,
