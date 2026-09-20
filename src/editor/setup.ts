@@ -5,7 +5,15 @@ import { languages } from '@codemirror/language-data'
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, drawSelection, keymap, rectangularSelection } from '@codemirror/view'
-import { toggleTask } from './commands'
+import {
+  insertLink,
+  toggleBold,
+  toggleCode,
+  toggleHighlight,
+  toggleItalic,
+  toggleStrike,
+  toggleTask,
+} from './commands'
 import { dialect } from './dialect'
 import { documentSource } from './images'
 import { frontmatterBlock } from './frontmatter'
@@ -57,6 +65,12 @@ export function editorExtensions({
     keymap.of([
       { key: 'Mod-s', preventDefault: true, run: () => (onSave(), true) },
       { key: 'Mod-Enter', preventDefault: true, run: toggleTask },
+      { key: 'Mod-b', preventDefault: true, run: toggleBold },
+      { key: 'Mod-i', preventDefault: true, run: toggleItalic },
+      { key: 'Mod-k', preventDefault: true, run: insertLink },
+      { key: 'Mod-e', preventDefault: true, run: toggleCode },
+      { key: 'Shift-Mod-x', preventDefault: true, run: toggleStrike },
+      { key: 'Shift-Mod-h', preventDefault: true, run: toggleHighlight },
       ...defaultKeymap,
       ...historyKeymap,
       ...searchKeymap,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { EDITOR_BINDINGS, SHORTCUTS, editorCap, keyCap, onApple } from './shortcuts'
 import { FONT_LABELS, LIMITS, type BodyFont, type Settings, type ThemeMode } from '~/app/settings'
 import { CloseIcon, GripIcon } from './icons'
 
@@ -197,12 +198,44 @@ export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocu
         <button
           type="button"
           className="settings-row is-clickable"
+          aria-pressed={settings.autosave}
+          onClick={() => update('autosave', !settings.autosave)}
+        >
+          <span className="settings-label">Salvar sozinho</span>
+          <span className="switch" data-on={settings.autosave} />
+        </button>
+
+        <button
+          type="button"
+          className="settings-row is-clickable"
           aria-pressed={settings.readOnly}
           onClick={() => update('readOnly', !settings.readOnly)}
         >
           <span className="settings-label">Somente leitura</span>
           <span className="switch" data-on={settings.readOnly} />
         </button>
+
+        <div className="settings-divider" />
+        <p className="section-label">Atalhos</p>
+
+        <div className="shortcut-list">
+          {SHORTCUTS.map((shortcut) => (
+            <div key={shortcut.id} className="shortcut-row">
+              <span className="settings-label">{shortcut.label}</span>
+              <kbd>{keyCap(shortcut)}</kbd>
+            </div>
+          ))}
+          <div className="shortcut-row">
+            <span className="settings-label">Ir para a aba</span>
+            <kbd>{onApple() ? '⌘1…9' : 'Ctrl+1…9'}</kbd>
+          </div>
+          {EDITOR_BINDINGS.map((binding) => (
+            <div key={binding.label} className="shortcut-row">
+              <span className="settings-label">{binding.label}</span>
+              <kbd>{editorCap(binding)}</kbd>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="settings-foot">

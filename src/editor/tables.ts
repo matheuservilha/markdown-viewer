@@ -124,6 +124,22 @@ function findTables(state: EditorState): Span[] {
   return found
 }
 
+/** A thin bar on the edge of the table, which opens that column's or row's menu. */
+function handle(kind: 'col' | 'row', entries: () => MenuEntry[]): HTMLElement {
+  const bar = document.createElement('div')
+  bar.className = 'cm-md-' + kind + '-handle'
+  bar.title = kind === 'col' ? 'Opções da coluna' : 'Opções da linha'
+  bar.addEventListener('mousedown', (event) => {
+    // Not letting the press through keeps the focus, and the unsaved text, in
+    // the cell that is being edited.
+    event.preventDefault()
+    event.stopPropagation()
+    const box = bar.getBoundingClientRect()
+    openMenu(box.left, box.bottom + 4, entries())
+  })
+  return bar
+}
+
 /** The table that starts at this position, read from the live document. */
 function tableAt(state: EditorState, from: number): Span | null {
   return findTables(state).find((table) => table.from === from) ?? null
@@ -337,21 +353,6 @@ class TableWidget extends WidgetType {
       cell.addEventListener('mouseleave', () => {
         for (const bar of bars()) bar.classList.remove('is-shown')
       })
-    }
-
-    const handle = (kind: 'col' | 'row', entries: () => MenuEntry[]) => {
-      const bar = document.createElement('div')
-      bar.className = 'cm-md-' + kind + '-handle'
-      bar.title = kind === 'col' ? 'Opções da coluna' : 'Opções da linha'
-      bar.addEventListener('mousedown', (event) => {
-        // Not letting the press through keeps the focus, and the unsaved text,
-        // in the cell that is being edited.
-        event.preventDefault()
-        event.stopPropagation()
-        const box = bar.getBoundingClientRect()
-        openMenu(box.left, box.bottom + 4, entries())
-      })
-      return bar
     }
 
     const columnMenu = (column: number): MenuEntry[] => [

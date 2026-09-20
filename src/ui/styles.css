@@ -1636,3 +1636,28 @@ a:focus-visible,
     animation: none !important;
   }
 }
+
+.shortcut-list {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.shortcut-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 1.6rem;
+  padding: 0 0.1rem;
+}
+
+.shortcut-row kbd {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}

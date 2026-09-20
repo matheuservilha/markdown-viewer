@@ -33,10 +33,10 @@ const cell = (row: number, column: number) =>
 const columnHandle = (column: number) =>
   cell(-1, column)!.parentElement!.querySelector<HTMLElement>('.cm-md-col-handle')!
 /** The thin bar left of a row. */
-const rowHandle = (row: number) =>
-  document
-    .querySelectorAll('.cm-md-table tbody tr')
-    [row]!.querySelector<HTMLElement>('.cm-md-row-handle')!
+const rowHandle = (row: number) => {
+  const rows = document.querySelectorAll('.cm-md-table tbody tr')
+  return rows[row]!.querySelector<HTMLElement>('.cm-md-row-handle')!
+}
 
 const menuItems = () =>
   [...document.querySelectorAll<HTMLElement>('.menu .menu-item')].map((item) => item.textContent!)
@@ -285,7 +285,7 @@ describe('o Markdown dentro da célula', () => {
     expect(document.querySelectorAll('.is-shown')).toHaveLength(0)
     alvo.dispatchEvent(new MouseEvent('mouseenter'))
     const acesas = [...document.querySelectorAll('.is-shown')].map((n) => n.className.split(' ')[0])
-    expect(acesas.sort()).toEqual(['cm-md-col-handle', 'cm-md-row-handle'])
+    expect(acesas.toSorted()).toEqual(['cm-md-col-handle', 'cm-md-row-handle'])
     alvo.dispatchEvent(new MouseEvent('mouseleave'))
     expect(document.querySelectorAll('.is-shown')).toHaveLength(0)
   })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadSession, saveSession, type Session, type ViewState } from '~/app/session'
-import { useSettings } from '~/app/settings'
+import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, parentPath, type Entry } from '~/platform/fs'
 import type { Heading } from '~/editor/outline'
@@ -12,6 +12,7 @@ import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { matchShortcut } from './shortcuts'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { InfoPanel } from './InfoPanel'
 import { MeasureGuides } from './MeasureGuides'
@@ -244,6 +245,9 @@ export function App() {
   // a ref to be written.
   const latestTab = useRef<Tab | null>(null)
   const latestDoc = useRef<Doc | null>(null)
+  // The keyboard handler is bound once and has to read the state of the
+  // moment the key was pressed, not of the render that bound it.
+  const latestState = useRef(state)
   useEffect(() => {
     // React allows writing a ref from an effect; the rule does not tell that
     // apart from writing one while rendering, which is the real hazard.
@@ -251,6 +255,8 @@ export function App() {
     latestTab.current = activeTab
     // oxlint-disable-next-line immutability
     latestDoc.current = activeDoc
+    // oxlint-disable-next-line immutability
+    latestState.current = state
   })
 
   // Dragging the window by its own interface, on the desktop.
@@ -337,16 +343,18 @@ export function App() {
     if (state.activeId) void actions.save(state.activeId)
   }, [actions, state.activeId])
 
-  // Autosave: a short pause in the typing writes the file.
+  // Autosave: a short pause in the typing writes the file. Off unless it was
+  // asked for in the settings, so that by default nothing reaches the disk
+  // that the person did not ask to be written.
   useEffect(() => {
     // The text is read so that every keystroke restarts the wait: that is the
     // whole point of the delay, not an accident of the dependency list.
-    if (!activeDoc) return
+    if (!settings.autosave || !activeDoc) return
     const { text, dirty, conflict } = activeDoc
     if (text === undefined || !dirty || conflict) return
     const timer = window.setTimeout(saveActive, AUTOSAVE_DELAY)
     return () => window.clearTimeout(timer)
-  }, [activeDoc, saveActive])
+  }, [activeDoc, saveActive, settings.autosave])
 
   /**
    * Noticing what changed behind our back. Three ways, because no single one
@@ -377,7 +385,9 @@ export function App() {
 
   // Saving on blur, and looking for changes made behind our back on focus.
   useEffect(() => {
-    const onBlur = () => saveActive()
+    const onBlur = () => {
+      if (settings.autosave) saveActive()
+    }
     const onFocus = () => void actions.checkExternalChanges()
     window.addEventListener('blur', onBlur)
     window.addEventListener('focus', onFocus)
@@ -385,33 +395,147 @@ export function App() {
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('focus', onFocus)
     }
-  }, [actions, saveActive])
+  }, [actions, saveActive, settings.autosave])
+
+  /**
+   * Closing a tab that has unsaved text asks first.
+   *
+   * With the automatic saving off, the text in the editor is the only copy
+   * there is, and closing the tab throws it away.
+   */
+  const closed = useRef<Tab[]>([])
+  const closeTab = useCallback(
+    (id: string) => {
+      const tab = latestState.current.tabs.find((candidate: Tab) => candidate.id === id)
+      const doc = latestState.current.docs[id]
+      if (tab && doc?.dirty) {
+        const go = window.confirm(
+          'Fechar "' + tab.name + '" sem salvar? O que foi escrito depois do último salvamento se perde.',
+        )
+        if (!go) return
+      }
+      if (tab) closed.current = [tab, ...closed.current].slice(0, 12)
+      actions.closeTab(id)
+    },
+    [actions],
+  )
+
+  const reopenTab = useCallback(() => {
+    const [tab, ...rest] = closed.current
+    if (!tab) return
+    closed.current = rest
+    void actions.openFile({ id: tab.id, baseId: tab.baseId, path: tab.path, name: tab.name } as Entry, false)
+  }, [actions])
+
+  const stepTab = useCallback(
+    (delta: number) => {
+      const { tabs, activeId } = latestState.current
+      if (tabs.length === 0) return
+      const at = tabs.findIndex((tab: Tab) => tab.id === activeId)
+      const next = tabs[(at + delta + tabs.length) % tabs.length]
+      if (next) actions.activateTab(next.id)
+    },
+    [actions],
+  )
+
+  const zoom = useCallback(
+    (by: number | null) => {
+      const { min, max, step } = LIMITS.uiScale
+      if (by === null) {
+        update('uiScale', DEFAULTS.uiScale)
+        return
+      }
+      const next = Math.round((settings.uiScale + by * step) * 100) / 100
+      update('uiScale', Math.min(max, Math.max(min, next)))
+    },
+    [settings.uiScale, update],
+  )
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!event.metaKey && !event.ctrlKey) return
-      if (event.key === '\\') {
+      const hit = matchShortcut(event)
+      if (hit === null) return
+      const { activeId, tabs, bases } = latestState.current
+
+      if (typeof hit === 'object') {
+        const tab: Tab | undefined = tabs[hit.tab - 1]
+        if (!tab) return
         event.preventDefault()
-        setSidebarOpen((open) => !open)
+        actions.activateTab(tab.id)
+        return
       }
-      if (event.key === 'w' && state.activeId) {
-        event.preventDefault()
-        actions.closeTab(state.activeId)
+
+      switch (hit) {
+        case 'save':
+          // Saving works wherever the focus is, including inside a table.
+          if (activeId) void actions.save(activeId)
+          break
+        case 'newFile': {
+          const base = tabs.find((tab: Tab) => tab.id === activeId)?.baseId ?? bases[0]?.id
+          if (!base) return
+          const parent = parentPath(tabs.find((tab: Tab) => tab.id === activeId)?.path ?? '')
+          void createIn(base, parent, 'file')
+          break
+        }
+        case 'openBase':
+          void actions.openBase()
+          break
+        case 'openFile':
+          void actions.openLooseFile()
+          break
+        case 'closeTab':
+          if (activeId) closeTab(activeId)
+          break
+        case 'reopenTab':
+          reopenTab()
+          break
+        case 'nextTab':
+          stepTab(1)
+          break
+        case 'previousTab':
+          stepTab(-1)
+          break
+        case 'toggleSidebar':
+          setSidebarOpen((open) => !open)
+          break
+        case 'toggleInfo':
+          update('infoPanel', !settings.infoPanel)
+          break
+        case 'settings':
+          setSettingsOpen((open) => !open)
+          break
+        case 'print': {
+          // The browser would otherwise print the interface itself.
+          if (!activeId) return
+          const item = documentMenu().find((entry) => entry.label.startsWith('Imprimir'))
+          item?.onSelect()
+          break
+        }
+        case 'zoomIn':
+          zoom(1)
+          break
+        case 'zoomOut':
+          zoom(-1)
+          break
+        case 'zoomReset':
+          zoom(null)
+          break
       }
-      if (event.key === ',') {
-        event.preventDefault()
-        setSettingsOpen((open) => !open)
-      }
-      if (event.key === 'p' && state.activeId) {
-        // The browser would otherwise print the interface itself.
-        event.preventDefault()
-        const item = documentMenu().find((entry) => entry.label.startsWith('Imprimir'))
-        item?.onSelect()
-      }
+      event.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [actions, documentMenu, state.activeId])
+  }, [
+    actions,
+    closeTab,
+    createIn,
+    documentMenu,
+    reopenTab,
+    settings.infoPanel,
+    stepTab,
+    update,
+    zoom,
+  ])
 
   const dark = theme === 'dark'
 
@@ -599,7 +723,7 @@ export function App() {
               state={state}
               onActivate={actions.activateTab}
               onPin={actions.pinTab}
-              onClose={actions.closeTab}
+              onClose={closeTab}
             />
           </div>
         )}

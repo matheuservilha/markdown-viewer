@@ -31,6 +31,8 @@ export interface Settings {
   showAllFiles: boolean
   themeMode: ThemeMode
   readOnly: boolean
+  /** Whether a pause in the typing writes the file by itself. */
+  autosave: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -45,6 +47,10 @@ export const DEFAULTS: Settings = {
   showAllFiles: false,
   themeMode: 'system',
   readOnly: false,
+  // Off: the file is written when the person asks, with Mod-S. Writing behind
+  // somebody's back is the kind of help that is only welcome when it was asked
+  // for.
+  autosave: false,
 }
 
 export const LIMITS = {
