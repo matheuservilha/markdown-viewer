@@ -1,15 +1,17 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import type { RecentBase, RecentFile, Recents as RecentsData } from '~/app/recents'
 import { isPlainText, isTextFile } from '~/platform/fs'
 import { ChevronIcon, FileIcon, FolderIcon, MarkdownIcon } from './icons'
 
-/** How many entries the panel shows before the rest is folded away. */
-const VISIBLE = 6
+/** How much history is worth showing. Older than this is noise. */
+const LIMIT = 8
 
 interface Props {
   recents: RecentsData
-  /** Ids of the folders already open, which do not need reopening. */
+  /** Ids of the folders already open, which need no shortcut back to themselves. */
   openBases: string[]
+  open: boolean
+  onToggle: () => void
   onOpenFile: (file: RecentFile) => void
   onOpenBase: (base: RecentBase) => void
   onClear: () => void
@@ -24,48 +26,26 @@ function FileMark({ name }: { name: string }) {
 export const Recents = memo(function Recents({
   recents,
   openBases,
+  open,
+  onToggle,
   onOpenFile,
   onOpenBase,
   onClear,
 }: Props) {
-  const [open, setOpen] = useState(true)
-  const [showAll, setShowAll] = useState(false)
-
-  // A folder already open needs no shortcut back to itself.
   const folders = recents.bases.filter((base) => !openBases.includes(base.id))
-  const files = recents.files
+  const files = recents.files.slice(0, LIMIT)
   if (folders.length === 0 && files.length === 0) return null
 
-  const shown = showAll ? files : files.slice(0, VISIBLE)
-
   return (
-    <section className="tree-section">
-      <div className="section-head">
-        <button
-          type="button"
-          className="section-toggle"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          <ChevronIcon size={12} className={'tree-twisty' + (open ? ' is-open' : '')} />
-          <h2 className="section-label">Recentes</h2>
-        </button>
-        {open && (
-          <div className="section-actions">
-            <button
-              type="button"
-              className="section-link"
-              title="Esquecer tudo que está listado aqui"
-              onClick={onClear}
-            >
-              limpar
-            </button>
-          </div>
-        )}
-      </div>
+    <div className={'recents' + (open ? ' is-open' : '')}>
+      <button type="button" className="foot-row" aria-expanded={open} onClick={onToggle}>
+        <ChevronIcon size={14} className={'tree-twisty' + (open ? ' is-open' : '')} />
+        <span className="foot-label">Recentes</span>
+        <span className="recents-count">{folders.length + files.length}</span>
+      </button>
 
       {open && (
-        <ul className="tree" role="group">
+        <ul className="tree recents-list" role="group">
           {folders.map((base) => (
             <li key={base.id}>
               <button
@@ -74,14 +54,13 @@ export const Recents = memo(function Recents({
                 title={base.label}
                 onClick={() => onOpenBase(base)}
               >
-                <span className="tree-twisty is-leaf" />
                 <FolderIcon size={15} className="tree-icon is-folder" />
                 <span className="tree-name">{base.name}</span>
               </button>
             </li>
           ))}
 
-          {shown.map((file) => (
+          {files.map((file) => (
             <li key={file.baseId + ':' + file.path}>
               <button
                 type="button"
@@ -89,29 +68,19 @@ export const Recents = memo(function Recents({
                 title={file.label ?? file.path}
                 onClick={() => onOpenFile(file)}
               >
-                <span className="tree-twisty is-leaf" />
                 <FileMark name={file.name} />
                 <span className="tree-name">{file.name}</span>
               </button>
             </li>
           ))}
 
-          {files.length > VISIBLE && (
-            <li>
-              <button
-                type="button"
-                className="tree-row is-more"
-                onClick={() => setShowAll((value) => !value)}
-              >
-                <span className="tree-twisty is-leaf" />
-                <span className="tree-name">
-                  {showAll ? 'mostrar menos' : 'mais ' + (files.length - VISIBLE)}
-                </span>
-              </button>
-            </li>
-          )}
+          <li>
+            <button type="button" className="tree-row is-quiet" onClick={onClear}>
+              <span className="tree-name">limpar histórico</span>
+            </button>
+          </li>
         </ul>
       )}
-    </section>
+    </div>
   )
 })

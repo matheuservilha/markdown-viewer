@@ -19,9 +19,9 @@ export const Breadcrumbs = memo(function Breadcrumbs({ tab, base }: Props) {
   const folders = base ? [base.name, ...segments] : segments
 
   return (
-    <nav className="crumbs" aria-label="Caminho do arquivo" title={tab.path}>
+    <nav className="crumbs" aria-label="Caminho do arquivo" title={tab.path} data-tauri-drag-region>
       {folders.map((folder, index) => (
-        <span key={folders.slice(0, index + 1).join('/')} className="crumb">
+        <span key={folders.slice(0, index + 1).join('/')} className="crumb" data-tauri-drag-region>
           {index > 0 && (
             <span className="crumb-sep" aria-hidden="true">
               /
@@ -30,7 +30,7 @@ export const Breadcrumbs = memo(function Breadcrumbs({ tab, base }: Props) {
           {folder}
         </span>
       ))}
-      <span className="crumb is-current">
+      <span className="crumb is-current" data-tauri-drag-region>
         {folders.length > 0 && (
           <span className="crumb-sep" aria-hidden="true">
             /

@@ -179,6 +179,19 @@ export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocu
         />
 
         <div className="settings-divider" />
+        <p className="section-label">Árvore</p>
+
+        <button
+          type="button"
+          className="settings-row is-clickable"
+          aria-pressed={settings.showAllFiles}
+          onClick={() => update('showAllFiles', !settings.showAllFiles)}
+        >
+          <span className="settings-label">Outros arquivos</span>
+          <span className="switch" data-on={settings.showAllFiles} />
+        </button>
+
+        <div className="settings-divider" />
         <p className="section-label">Edição</p>
 
         <button

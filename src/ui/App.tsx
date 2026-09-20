@@ -26,7 +26,6 @@ import {
   BrandMark,
   CollapseIcon,
   CrosshairIcon,
-  EyeIcon,
   FilePlusIcon,
   FolderPlusIcon,
   MoreIcon,
@@ -47,7 +46,6 @@ export function App() {
   const { settings, update, reset } = useSettings()
   const theme = useResolvedTheme(settings.themeMode)
   const [sidebarOpen, setSidebarOpen] = useState(() => loadSession()?.sidebarOpen ?? true)
-  const [showAllFiles, setShowAllFiles] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [measuring, setMeasuring] = useState(false)
   const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number } | null>(null)
@@ -404,10 +402,26 @@ export function App() {
 
   return (
     <div className={'shell' + (sidebarOpen ? '' : ' is-collapsed')}>
+      {/* The desktop window has no title bar, so this strip is what it is
+          dragged by. Tauri only starts a drag when the press lands on the
+          element carrying the attribute, never on a child of it, which is why
+          the strip is empty and why the text below repeats the attribute. */}
+      <div className="drag-strip" data-tauri-drag-region />
       <aside className="sidebar">
         <div className="brand" data-tauri-drag-region>
           <BrandMark />
-          <span className="brand-name">markdown-viewer</span>
+          <span className="brand-name" data-tauri-drag-region>
+            markdown-viewer
+          </span>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={dark ? 'Usar o tema claro' : 'Usar o tema escuro'}
+            title={dark ? 'Usar o tema claro' : 'Usar o tema escuro'}
+            onClick={() => update('themeMode', dark ? 'light' : 'dark')}
+          >
+            {dark ? <MoonIcon size={16} /> : <SunIcon size={16} />}
+          </button>
           <button
             type="button"
             className="icon-button"
@@ -465,14 +479,6 @@ export function App() {
         )}
 
         <nav className="tree-scroll" role="tree" aria-label="Arquivos">
-          <Recents
-            recents={state.recents}
-            openBases={state.bases.map((base) => base.id)}
-            onOpenFile={(file) => void actions.openRecentFile(file)}
-            onOpenBase={(base) => void actions.openRecentBase(base)}
-            onClear={actions.forgetRecents}
-          />
-
           {state.bases.map((base) => (
             <section className="tree-section" key={base.id}>
               <div className="section-head">
@@ -522,7 +528,7 @@ export function App() {
                 data={treeData}
                 parentId={entryId(base.id, '')}
                 depth={0}
-                showAllFiles={showAllFiles}
+                showAllFiles={settings.showAllFiles}
                 renamingId={renamingId}
                 {...tree}
               />
@@ -531,19 +537,16 @@ export function App() {
         </nav>
 
         <div className="sidebar-foot">
+          <Recents
+            recents={state.recents}
+            openBases={state.bases.map((base) => base.id)}
+            open={settings.recentsOpen}
+            onToggle={() => update('recentsOpen', !settings.recentsOpen)}
+            onOpenFile={(file) => void actions.openRecentFile(file)}
+            onOpenBase={(base) => void actions.openRecentBase(base)}
+            onClear={actions.forgetRecents}
+          />
           <div className="accent-rule" />
-          {state.bases.length > 0 && (
-            <button
-              type="button"
-              className="foot-row"
-              aria-pressed={showAllFiles}
-              onClick={() => setShowAllFiles((shown) => !shown)}
-            >
-              <EyeIcon size={16} />
-              <span className="foot-label">Outros arquivos</span>
-              <span className="switch" data-on={showAllFiles} />
-            </button>
-          )}
           <button
             type="button"
             className="foot-row"
@@ -552,16 +555,6 @@ export function App() {
             <SettingsIcon size={16} />
             <span className="foot-label">Ajustes</span>
             <kbd className="foot-key">⌘,</kbd>
-          </button>
-          <button
-            type="button"
-            className="foot-row"
-            aria-pressed={dark}
-            onClick={() => update('themeMode', dark ? 'light' : 'dark')}
-          >
-            {dark ? <MoonIcon size={16} /> : <SunIcon size={16} />}
-            <span className="foot-label">Modo escuro</span>
-            <span className="switch" data-on={dark} />
           </button>
         </div>
       </aside>
@@ -574,21 +567,14 @@ export function App() {
       )}
 
       <main className="workspace">
-        <Tabs
-          state={state}
-          onActivate={actions.activateTab}
-          onPin={actions.pinTab}
-          onClose={actions.closeTab}
-        />
-
-        {/* The bar stays up whenever there is something for it to carry, which
-            includes the only way back from a collapsed sidebar. */}
-        {(activeTab || !sidebarOpen) && (
-          <header className="topbar" data-tauri-drag-region>
+        {/* The reveal button sits in this row and not in the breadcrumb bar, so
+            that it stays at the height it was pressed at. */}
+        {(state.tabs.length > 0 || !sidebarOpen) && (
+          <div className="workspace-top">
             {!sidebarOpen && (
               <button
                 type="button"
-                className="icon-button"
+                className="icon-button is-reveal"
                 aria-label="Mostrar a barra lateral"
                 title="Mostrar a barra lateral (⌘\)"
                 onClick={() => setSidebarOpen(true)}
@@ -596,14 +582,23 @@ export function App() {
                 <SidebarIcon />
               </button>
             )}
-            {activeTab ? (
-              <Breadcrumbs
-                tab={activeTab}
-                base={state.bases.find((base) => base.id === activeTab.baseId)}
-              />
-            ) : (
-              <span className="crumbs" />
-            )}
+            <Tabs
+              state={state}
+              onActivate={actions.activateTab}
+              onPin={actions.pinTab}
+              onClose={actions.closeTab}
+            />
+          </div>
+        )}
+
+        {/* The bar stays up whenever there is something for it to carry, which
+            includes the only way back from a collapsed sidebar. */}
+        {activeTab && (
+          <header className="topbar" data-tauri-drag-region>
+            <Breadcrumbs
+              tab={activeTab}
+              base={state.bases.find((base) => base.id === activeTab.baseId)}
+            />
             {activeDoc && (
               <span className="save-state" data-state={activeDoc.dirty ? 'dirty' : 'saved'}>
                 <span className="save-dot" />

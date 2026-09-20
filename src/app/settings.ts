@@ -25,6 +25,10 @@ export interface Settings {
   sidebarWidth: number
   /** Whether the outline and links panel is showing. */
   infoPanel: boolean
+  /** Whether the history at the foot of the sidebar is open. */
+  recentsOpen: boolean
+  /** Whether the tree shows the files this editor cannot open. */
+  showAllFiles: boolean
   themeMode: ThemeMode
   readOnly: boolean
 }
@@ -37,6 +41,8 @@ export const DEFAULTS: Settings = {
   uiScale: 1.12,
   sidebarWidth: 216,
   infoPanel: false,
+  recentsOpen: false,
+  showAllFiles: false,
   themeMode: 'system',
   readOnly: false,
 }
