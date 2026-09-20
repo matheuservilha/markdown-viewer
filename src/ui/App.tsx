@@ -19,6 +19,7 @@ import { Recents } from './Recents'
 import { SettingsWindow } from './SettingsWindow'
 import { SidebarResizer } from './SidebarResizer'
 import { canPrint, printHtml } from './print'
+import { installWindowDrag } from './window-drag'
 import { StatusBar } from './StatusBar'
 import { Tabs } from './Tabs'
 import {
@@ -252,6 +253,20 @@ export function App() {
     latestDoc.current = activeDoc
   })
 
+  // Dragging the window by its own interface, on the desktop.
+  useEffect(() => {
+    let stop: (() => void) | null = null
+    let cancelled = false
+    void installWindowDrag().then((off) => {
+      if (cancelled) off()
+      else stop = off
+    })
+    return () => {
+      cancelled = true
+      stop?.()
+    }
+  }, [])
+
   // Reopen last session once, before anything else touches the workspace.
   const previous = useRef<Session | null>(null)
   const restoreStarted = useRef(false)
@@ -406,13 +421,20 @@ export function App() {
           dragged by. Tauri only starts a drag when the press lands on the
           element carrying the attribute, never on a child of it, which is why
           the strip is empty and why the text below repeats the attribute. */}
-      <div className="drag-strip" data-tauri-drag-region />
+      <div className="drag-strip" data-drag-window />
       <aside className="sidebar">
-        <div className="brand" data-tauri-drag-region>
+        <div className="brand" data-drag-window>
           <BrandMark />
-          <span className="brand-name" data-tauri-drag-region>
-            markdown-viewer
-          </span>
+          <span className="brand-name">markdown-viewer</span>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Ajustes"
+            title="Ajustes (⌘,)"
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            <SettingsIcon size={16} />
+          </button>
           <button
             type="button"
             className="icon-button"
@@ -537,6 +559,7 @@ export function App() {
         </nav>
 
         <div className="sidebar-foot">
+          <div className="accent-rule" />
           <Recents
             recents={state.recents}
             openBases={state.bases.map((base) => base.id)}
@@ -546,16 +569,6 @@ export function App() {
             onOpenBase={(base) => void actions.openRecentBase(base)}
             onClear={actions.forgetRecents}
           />
-          <div className="accent-rule" />
-          <button
-            type="button"
-            className="foot-row"
-            onClick={() => setSettingsOpen((open) => !open)}
-          >
-            <SettingsIcon size={16} />
-            <span className="foot-label">Ajustes</span>
-            <kbd className="foot-key">⌘,</kbd>
-          </button>
         </div>
       </aside>
 
@@ -594,7 +607,7 @@ export function App() {
         {/* The bar stays up whenever there is something for it to carry, which
             includes the only way back from a collapsed sidebar. */}
         {activeTab && (
-          <header className="topbar" data-tauri-drag-region>
+          <header className="topbar" data-drag-window>
             <Breadcrumbs
               tab={activeTab}
               base={state.bases.find((base) => base.id === activeTab.baseId)}
