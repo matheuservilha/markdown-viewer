@@ -229,3 +229,64 @@ describe('a grade editável', () => {
     expect(document.querySelector('.menu')).toBeNull()
   })
 })
+
+describe('o Markdown dentro da célula', () => {
+  const rico = [
+    '| Item | Detalhe |',
+    '|---|---|',
+    '| **negrito** | `código` |',
+    '| *itálico* | [link](https://exemplo.com) |',
+  ].join('\n')
+
+  it('desenha a marcação em vez de mostrar os asteriscos', () => {
+    mount(rico)
+    expect(cell(0, 0)?.querySelector('strong')?.textContent).toBe('negrito')
+    expect(cell(0, 1)?.querySelector('code')?.textContent).toBe('código')
+    expect(cell(1, 0)?.querySelector('em')?.textContent).toBe('itálico')
+    expect(cell(1, 1)?.querySelector('a')?.getAttribute('href')).toBe('https://exemplo.com')
+    expect(cell(0, 0)?.textContent).toBe('negrito')
+  })
+
+  it('volta ao Markdown cru quando o cursor entra', () => {
+    mount(rico)
+    const field = cell(0, 0)!
+    field.dispatchEvent(new FocusEvent('focus'))
+    expect(field.textContent).toBe('**negrito**')
+    expect(field.querySelector('strong')).toBeNull()
+  })
+
+  it('redesenha ao sair, mesmo sem ter mudado nada', () => {
+    const editor = mount(rico)
+    const antes = editor.state.doc.toString()
+    const field = cell(0, 0)!
+    field.dispatchEvent(new FocusEvent('focus'))
+    field.dispatchEvent(new FocusEvent('blur'))
+    expect(field.querySelector('strong')?.textContent).toBe('negrito')
+    expect(editor.state.doc.toString()).toBe(antes)
+  })
+
+  it('salva o Markdown que a pessoa digitou, não o desenho', () => {
+    const editor = mount(rico)
+    const field = cell(0, 0)!
+    field.dispatchEvent(new FocusEvent('focus'))
+    field.textContent = '**outro**'
+    field.dispatchEvent(new FocusEvent('blur'))
+    expect(editor.state.doc.toString()).toContain('| **outro** | `código` |')
+  })
+
+  it('não deixa passar script escrito na célula', () => {
+    mount(['| a |', '|---|', '| <script>alert(1)</script> |'].join('\n'))
+    expect(cell(0, 0)?.querySelector('script')).toBeNull()
+  })
+
+  it('a alça acende só na célula sob o ponteiro', () => {
+    mount()
+    const alvo = cell(1, 0)!.parentElement!
+    expect(document.querySelectorAll('.is-shown')).toHaveLength(0)
+    alvo.dispatchEvent(new MouseEvent('mouseenter'))
+    const acesas = [...document.querySelectorAll('.is-shown')].map((n) => n.className.split(' ')[0])
+    expect(acesas.sort()).toEqual(['cm-md-col-handle', 'cm-md-row-handle'])
+    alvo.dispatchEvent(new MouseEvent('mouseleave'))
+    expect(document.querySelectorAll('.is-shown')).toHaveLength(0)
+  })
+})

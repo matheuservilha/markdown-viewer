@@ -339,7 +339,9 @@ export const editorTheme = EditorView.theme({
   },
 
   // The handles: thin bars on the edge of the table, the way a spreadsheet
-  // does it. They are always in the layout and only ever change colour, so
+  // does it. Only the ones belonging to the cell under the pointer light up:
+  // lighting all of them at once draws a continuous track that reads as a
+  // scrollbar. They are always in the layout and only ever change colour, so
   // nothing on the page moves when the pointer arrives.
   '.cm-md-col-handle, .cm-md-row-handle': {
     position: 'absolute',
@@ -348,14 +350,37 @@ export const editorTheme = EditorView.theme({
     cursor: 'pointer',
     transition: 'background 90ms ease',
   },
-  '.cm-md-col-handle': { top: '-7px', left: '-1px', right: '-1px', height: '4px' },
-  '.cm-md-row-handle': { left: '-7px', top: '-1px', bottom: '-1px', width: '4px' },
-  '.cm-md-table-wrap:hover .cm-md-col-handle, .cm-md-table-wrap:hover .cm-md-row-handle': {
+  '.cm-md-col-handle': { top: '-6px', left: '0', right: '0', height: '4px' },
+  '.cm-md-row-handle': { left: '-6px', top: '0', bottom: '0', width: '4px' },
+  '.cm-md-col-handle.is-shown, .cm-md-row-handle.is-shown': {
     background: 'var(--border-emphasis)',
   },
-  '.cm-md-table-wrap .cm-md-col-handle:hover, .cm-md-table-wrap .cm-md-row-handle:hover': {
-    background: 'var(--accent)',
+  '.cm-md-col-handle:hover, .cm-md-row-handle:hover': { background: 'var(--accent)' },
+
+  // Markdown drawn inside a cell. The editor's own colours come from the
+  // syntax tree of the document, which does not reach into a widget.
+  '.cm-md-cell-text code': {
+    padding: '0.1em 0.35em',
+    borderRadius: '4px',
+    background: 'var(--surface-2)',
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.88em',
   },
+  '.cm-md-cell-text strong': { color: 'var(--text-primary)', fontWeight: '620' },
+  '.cm-md-cell-text em': { fontStyle: 'italic' },
+  '.cm-md-cell-text del': { textDecoration: 'line-through', color: 'var(--text-tertiary)' },
+  '.cm-md-cell-text mark': {
+    padding: '0.05em 0.2em',
+    borderRadius: '3px',
+    background: 'color-mix(in srgb, var(--accent) 28%, transparent)',
+    color: 'inherit',
+  },
+  '.cm-md-cell-text a, .cm-md-cell-text .wikilink': {
+    color: 'var(--accent-text)',
+    textDecoration: 'none',
+  },
+  '.cm-md-cell-text .footnote': { color: 'var(--accent-text)', fontSize: '0.75em' },
 })
 
 export const markdownHighlight = syntaxHighlighting(

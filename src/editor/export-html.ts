@@ -89,6 +89,20 @@ function renderFragment(text: string, context: Context): string {
   return render(parser.parse(text).topNode, { text, images: context.images })
 }
 
+/**
+ * The inline Markdown of a short fragment, as HTML.
+ *
+ * A table cell holds one line of Markdown, and drawing it with the same
+ * renderer the export uses keeps the bold in a cell looking like the bold
+ * everywhere else, instead of a second parser that drifts from this one.
+ */
+export function renderInlineHtml(text: string): string {
+  const context: Context = { text, images: [] }
+  const paragraph = parser.parse(text).topNode.firstChild
+  if (!paragraph || paragraph.name !== 'Paragraph') return escape(text)
+  return children(paragraph, context)
+}
+
 const QUOTE_PREFIX = /^\s{0,3}>\s?/
 const CALLOUT_MARKER = /^\[!\w+\][+-]?\s*/
 

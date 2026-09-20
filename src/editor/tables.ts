@@ -12,6 +12,7 @@
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
 import { activeLines, overlaps } from './active'
+import { renderInline } from './inline'
 import { closeMenu, openMenu, type MenuEntry } from './menu'
 import {
   insertColumn,
@@ -260,10 +261,30 @@ class TableWidget extends WidgetType {
       field.className = 'cm-md-cell-text'
       field.contentEditable = 'true'
       field.spellcheck = false
-      field.textContent = cellOf(row, column)
       field.dataset.row = String(row)
       field.dataset.column = String(column)
       field.style.textAlign = model.align[column] ?? 'left'
+
+      /** Out of the cell: the Markdown is drawn, not shown. */
+      const show = () => field.replaceChildren(renderInline(cellOf(row, column)))
+      /** In the cell: the Markdown itself, which is what gets edited. */
+      const edit = () => {
+        field.textContent = cellOf(row, column)
+      }
+      show()
+
+      // The caret lands wherever the click fell inside the drawn text, which
+      // is not a position in the Markdown. It goes to the end instead, which
+      // at least is a place the person can predict.
+      field.addEventListener('focus', () => {
+        edit()
+        const range = document.createRange()
+        range.selectNodeContents(field)
+        range.collapse(false)
+        const selection = window.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+      })
 
       const commit = (focus: Focus | null): boolean => {
         const value = (field.textContent ?? '').replace(/\n/g, ' ').trim()
@@ -289,17 +310,35 @@ class TableWidget extends WidgetType {
         }
         if (event.key === 'Escape') {
           event.preventDefault()
-          field.textContent = cellOf(row, column)
+          edit()
           field.blur()
         }
       })
 
-      field.addEventListener('blur', () => commit(null))
+      field.addEventListener('blur', () => {
+        // A commit rebuilds the whole widget, drawn from the start. When
+        // nothing changed there is no rebuild, so the drawing comes back here.
+        if (!commit(null)) show()
+      })
       element.append(field)
       return element
     }
 
     // ---- the handles: thin bars on the edge, like a spreadsheet ------------
+    const colHandles: HTMLElement[] = []
+    const rowHandles: HTMLElement[] = []
+
+    /** Obsidian shows the bars of the cell under the pointer, and only those. */
+    const trackPointer = (cell: HTMLElement, row: number, column: number) => {
+      const bars = () => [colHandles[column], rowHandles[row]].filter((bar) => bar !== undefined)
+      cell.addEventListener('mouseenter', () => {
+        for (const bar of bars()) bar.classList.add('is-shown')
+      })
+      cell.addEventListener('mouseleave', () => {
+        for (const bar of bars()) bar.classList.remove('is-shown')
+      })
+    }
+
     const handle = (kind: 'col' | 'row', entries: () => MenuEntry[]) => {
       const bar = document.createElement('div')
       bar.className = 'cm-md-' + kind + '-handle'
@@ -363,7 +402,10 @@ class TableWidget extends WidgetType {
     const headRow = document.createElement('tr')
     model.header.forEach((_, column) => {
       const cell = makeCell(-1, column)
-      cell.append(handle('col', () => columnMenu(column)))
+      const bar = handle('col', () => columnMenu(column))
+      colHandles[column] = bar
+      cell.append(bar)
+      trackPointer(cell, -1, column)
       headRow.append(cell)
     })
     thead.append(headRow)
@@ -374,7 +416,12 @@ class TableWidget extends WidgetType {
       const tr = document.createElement('tr')
       for (let column = 0; column < width; column++) {
         const cell = makeCell(row, column)
-        if (column === 0) cell.append(handle('row', () => rowMenu(row)))
+        if (column === 0) {
+          const bar = handle('row', () => rowMenu(row))
+          rowHandles[row] = bar
+          cell.append(bar)
+        }
+        trackPointer(cell, row, column)
         tr.append(cell)
       }
       tbody.append(tr)
