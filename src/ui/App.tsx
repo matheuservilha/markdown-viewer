@@ -175,8 +175,8 @@ export function App() {
     }
     const copy = (text: string) => void navigator.clipboard.writeText(text)
     const stem = tab.name.replace(/\.[^.]+$/, '')
-    const html = (palette: 'auto' | 'light') =>
-      exportDocument(stem, doc.text, source, { theme: palette })
+    const html = (palette: 'auto' | 'light', forRaster = false) =>
+      exportDocument(stem, doc.text, source, { theme: palette, forRaster })
 
     return [
       {
@@ -194,7 +194,7 @@ export function App() {
         hint: '⌘P',
         onSelect: () => {
           setBusy('Gerando o PDF')
-          void html('light')
+          void html('light', true)
             .then((page) => htmlToPdf(page))
             .then((bytes) => files.saveAs(stem + '.pdf', bytes))
             .catch((error: unknown) =>

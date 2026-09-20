@@ -13,7 +13,14 @@
 
 /** Width of the rendered page, in CSS px, before rasterising. */
 const PAGE_WIDTH = 820
-const SCALE = 2.5
+
+/**
+ * 2x over an A4 text column lands around 220 dpi, which holds up on paper. Each
+ * step above this costs about half a megabyte per page for no visible gain at
+ * reading size, measured on a nine page note.
+ */
+const SCALE = 2
+const QUALITY = 0.82
 
 /** A4 in points, which is what jsPDF measures in. */
 const A4 = { width: 595.28, height: 841.89 }
@@ -53,6 +60,59 @@ async function withHiddenFrame<T>(html: string, run: (frame: HTMLIFrameElement) 
   }
 }
 
+/** Things that must not be sliced through, whatever the page height says. */
+const ATOMIC = 'img, pre, table, hr'
+
+/**
+ * Where a page may end.
+ *
+ * Every line of text offers its own bottom edge as a candidate, which is what
+ * keeps a page break from cutting a line in half. Pictures, code blocks and
+ * tables are treated as indivisible: a break may land after one, never inside.
+ */
+function breakPoints(page: Document): { candidates: number[]; forbidden: [number, number][] } {
+  const candidates = new Set<number>([0])
+  const forbidden: [number, number][] = []
+
+  for (const element of page.body.querySelectorAll(ATOMIC)) {
+    const box = element.getBoundingClientRect()
+    forbidden.push([box.top, box.bottom])
+    candidates.add(box.bottom)
+  }
+
+  const range = page.createRange()
+  const walker = page.createTreeWalker(page.body, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.nodeValue?.trim()) continue
+    range.selectNodeContents(node)
+    for (const rect of range.getClientRects()) candidates.add(rect.bottom)
+  }
+
+  for (const element of page.body.children) {
+    candidates.add(element.getBoundingClientRect().bottom)
+  }
+
+  return {
+    candidates: [...candidates].toSorted((a, b) => a - b),
+    forbidden,
+  }
+}
+
+/** The last place a page can end without cutting through anything. */
+function lastBreakBefore(
+  limit: number,
+  after: number,
+  { candidates, forbidden }: ReturnType<typeof breakPoints>,
+): number | null {
+  for (let index = candidates.length - 1; index >= 0; index--) {
+    const point = candidates[index]!
+    if (point > limit || point <= after) continue
+    if (forbidden.some(([top, bottom]) => point > top && point < bottom)) continue
+    return point
+  }
+  return null
+}
+
 /** A picture that has not loaded yet rasterises as a blank box. */
 async function waitForImages(scope: Document): Promise<void> {
   const images = [...scope.querySelectorAll('img')]
@@ -83,9 +143,12 @@ export async function htmlToPdf(
 
   onProgress?.('rendering')
 
+  let breaks: ReturnType<typeof breakPoints> = { candidates: [0], forbidden: [] }
+
   const canvas = await withHiddenFrame(html, async (frame) => {
     const body = frame.contentDocument?.body
     if (!body) throw new Error('A página não pôde ser montada para virar PDF.')
+    breaks = breakPoints(frame.contentDocument!)
     return html2canvas(body, {
       scale: SCALE,
       backgroundColor: '#ffffff',
@@ -103,16 +166,24 @@ export async function htmlToPdf(
 
   // How many source pixels fit on one page, once the canvas is scaled to the
   // printable width.
-  const pixelsPerPage = Math.floor((canvas.width * printable.height) / printable.width)
-  const pages = Math.max(1, Math.ceil(canvas.height / pixelsPerPage))
+  const pixelsPerPage = (canvas.width * printable.height) / printable.width
 
   const slice = document.createElement('canvas')
   const context = slice.getContext('2d')
   if (!context) throw new Error('O navegador não deu um canvas para desenhar o PDF.')
 
-  for (let page = 0; page < pages; page++) {
-    const top = page * pixelsPerPage
-    const height = Math.min(pixelsPerPage, canvas.height - top)
+  let top = 0
+  let first = true
+  while (top < canvas.height) {
+    const limit = Math.min(top + pixelsPerPage, canvas.height)
+    // Snap the cut to a line boundary, unless nothing fits, in which case the
+    // page is filled to the brim and the cut falls where it falls.
+    const snapped =
+      limit >= canvas.height
+        ? canvas.height
+        : (lastBreakBefore(limit / SCALE, top / SCALE, breaks) ?? 0) * SCALE
+    const bottom = snapped > top ? snapped : limit
+    const height = Math.ceil(bottom - top)
 
     slice.width = canvas.width
     slice.height = height
@@ -120,9 +191,10 @@ export async function htmlToPdf(
     context.fillRect(0, 0, slice.width, slice.height)
     context.drawImage(canvas, 0, top, canvas.width, height, 0, 0, canvas.width, height)
 
-    if (page > 0) pdf.addPage()
+    if (!first) pdf.addPage()
+    first = false
     pdf.addImage(
-      slice.toDataURL('image/jpeg', 0.92),
+      slice.toDataURL('image/jpeg', QUALITY),
       'JPEG',
       MARGIN,
       MARGIN,
@@ -131,6 +203,8 @@ export async function htmlToPdf(
       undefined,
       'FAST',
     )
+
+    top = bottom
   }
 
   onProgress?.('writing')
