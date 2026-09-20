@@ -12,9 +12,9 @@ const STORE = 'handles'
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1)
-    request.onupgradeneeded = () => request.result.createObjectStore(STORE)
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
+    request.addEventListener('upgradeneeded', () => request.result.createObjectStore(STORE))
+    request.addEventListener('success', () => resolve(request.result))
+    request.addEventListener('error', () => reject(request.error))
   })
 }
 
@@ -26,8 +26,8 @@ async function transact<T>(
   try {
     return await new Promise<T>((resolve, reject) => {
       const request = run(database.transaction(STORE, mode).objectStore(STORE))
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
+      request.addEventListener('success', () => resolve(request.result))
+      request.addEventListener('error', () => reject(request.error))
     })
   } finally {
     database.close()

@@ -6,7 +6,7 @@
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { tags as t } from '@lezer/highlight'
-import { highlightTag, wikilinkTag } from './dialect'
+import { footnoteTag, highlightTag, wikilinkTag } from './dialect'
 
 export const editorTheme = EditorView.theme({
   '&': {
@@ -97,8 +97,18 @@ export const editorTheme = EditorView.theme({
     fontFamily: 'var(--font-heading)',
     fontWeight: '620',
   },
-  '.cm-md-h1': { fontSize: '1.5em', letterSpacing: '-0.02em', lineHeight: '1.3', paddingTop: '0.8em' },
-  '.cm-md-h2': { fontSize: '1.28em', letterSpacing: '-0.015em', lineHeight: '1.35', paddingTop: '0.7em' },
+  '.cm-md-h1': {
+    fontSize: '1.5em',
+    letterSpacing: '-0.02em',
+    lineHeight: '1.3',
+    paddingTop: '0.8em',
+  },
+  '.cm-md-h2': {
+    fontSize: '1.28em',
+    letterSpacing: '-0.015em',
+    lineHeight: '1.35',
+    paddingTop: '0.7em',
+  },
   '.cm-md-h3': { fontSize: '1.12em', lineHeight: '1.4', paddingTop: '0.5em' },
   '.cm-md-h4': { fontSize: '1em', paddingTop: '0.4em' },
   '.cm-md-h5': { fontSize: '0.94em' },
@@ -222,6 +232,53 @@ export const editorTheme = EditorView.theme({
   '.cm-md-callout-example': { '--callout-color': 'var(--tone-purple)' },
   '.cm-md-callout-quote': { '--callout-color': 'var(--border-emphasis)' },
 
+  // Images, drawn where they are written.
+  '.cm-md-image': {
+    position: 'relative',
+    display: 'inline-block',
+    maxWidth: '100%',
+    lineHeight: '0',
+    verticalAlign: 'top',
+  },
+  '.cm-md-image img': {
+    maxWidth: '100%',
+    borderRadius: 'var(--radius-md)',
+    background: 'var(--surface-1)',
+  },
+  '.cm-md-image.is-missing::after': {
+    display: 'block',
+    padding: '10px 14px',
+    border: '1px dashed var(--border-emphasis)',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--text-disabled)',
+    content: '"imagem não encontrada"',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '11px',
+    lineHeight: '1.2',
+  },
+  '.cm-md-image-handle': {
+    position: 'absolute',
+    right: '-3px',
+    bottom: '6px',
+    width: '12px',
+    height: '28px',
+    borderRadius: '999px',
+    background: 'var(--accent)',
+    cursor: 'ew-resize',
+    opacity: '0',
+    transition: 'opacity 140ms ease',
+  },
+  '.cm-md-image:hover .cm-md-image-handle': { opacity: '0.85' },
+
+  // Footnote definitions, kept apart from the prose.
+  '.cm-md-footnote-def': {
+    paddingLeft: '18px',
+    borderLeft: '2px solid var(--border-subtle)',
+    color: 'var(--text-tertiary)',
+    fontSize: '0.92em',
+  },
+  '.cm-md-footnote-def.is-first': { marginTop: '0.5em' },
+
   // Tables, drawn as a grid while the cursor is elsewhere.
   '.cm-md-table-wrap': { margin: '0.4em 20px 1.4em', overflowX: 'auto' },
   '.cm-md-table': {
@@ -270,6 +327,12 @@ export const markdownHighlight = syntaxHighlighting(
       color: 'var(--text-primary)',
     },
     { tag: [t.link, t.url, wikilinkTag], color: 'var(--accent-text)' },
+    {
+      tag: footnoteTag,
+      color: 'var(--accent-text)',
+      fontSize: '0.75em',
+      verticalAlign: 'super',
+    },
     {
       tag: t.monospace,
       padding: '0.1em 0.3em',

@@ -13,8 +13,12 @@ interface Props {
   tab: Tab
   doc: Doc
   readOnly: boolean
-  /** Where the cursor and the scroll were when this file was last open. */
-  initialView: ViewState | undefined
+  /**
+   * Where the cursor and the scroll were when this file was last open. It is a
+   * function so that the value is read when the editor is built and not while
+   * the component renders.
+   */
+  getInitialView: () => ViewState | undefined
   onViewChange: (view: ViewState) => void
   onChange: (text: string) => void
   onSave: () => void
@@ -24,7 +28,7 @@ export function EditorPane({
   tab,
   doc,
   readOnly,
-  initialView,
+  getInitialView,
   onViewChange,
   onChange,
   onSave,
@@ -43,6 +47,8 @@ export function EditorPane({
     const extensions = [
       ...editorExtensions({
         title: tab.name,
+        baseId: tab.baseId,
+        path: tab.path,
         plainText: isPlainTextTab(tab),
         readOnly,
         onSave: () => handlers.current.onSave(),
@@ -53,7 +59,11 @@ export function EditorPane({
       }),
     ]
 
-    const restored = parked.current.get(tab.id)
+    // Copied out of the ref so the cleanup below does not read `.current`
+    // after the component has moved on.
+    const states = parked.current
+    const initialView = getInitialView()
+    const restored = states.get(tab.id)
     const instance = new EditorView({
       state:
         restored && restored.doc.toString() === doc.text
@@ -106,7 +116,7 @@ export function EditorPane({
         selection: { anchor: range.anchor, head: range.head },
         scrollTop: scroller.scrollTop,
       })
-      parked.current.set(tab.id, instance.state)
+      states.set(tab.id, instance.state)
       instance.destroy()
       view.current = null
     }

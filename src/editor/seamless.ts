@@ -24,6 +24,7 @@ import {
 import { activeLines, overlaps, sameLines, type LineSpan } from './active'
 import { CalloutIconWidget, parseCallout } from './callouts'
 import { findFrontmatter } from './frontmatter'
+import { documentSource, ImageWidget, parseImage } from './images'
 import { BulletWidget, RuleWidget, TaskWidget } from './widgets'
 
 const hidden = Decoration.replace({})
@@ -109,6 +110,7 @@ function build(view: EditorView): DecorationSet {
   // has to be left alone: a replaced range may not contain another one, and the
   // raw YAML is what the person should see once the block is open.
   const matter = findFrontmatter(state)
+  const source = state.facet(documentSource)
 
   for (const visible of view.visibleRanges) {
     const { from, to } = visible
@@ -153,6 +155,31 @@ function build(view: EditorView): DecorationSet {
           case 'CodeBlock':
             decorateBlock(state, node, visible, 'cm-md-code', out)
             return
+          case 'Image':
+          case 'Embed': {
+            // The markup comes back on the cursor's line like everything else,
+            // and the children are left alone either way: a replaced range may
+            // not contain another one.
+            if (revealed || !source) return false
+            const spec = parseImage(state.doc.sliceString(node.from, node.to))
+            if (!spec) return false
+            out.push(
+              Decoration.replace({
+                widget: new ImageWidget(spec, source, node.from, node.to),
+              }).range(node.from, node.to),
+            )
+            return false
+          }
+
+          case 'Paragraph': {
+            // `[^1]: uma nota` is a footnote definition, drawn apart from the
+            // prose around it.
+            const first = state.doc.lineAt(node.from)
+            if (!/^\[\^[^\]]+\]:/.test(first.text)) return
+            decorateBlock(state, node, visible, 'cm-md-footnote-def', out)
+            return
+          }
+
           case 'Table':
             // A collapsed table is drawn whole by `tableBlocks`, and nothing
             // inside a replaced range may carry a decoration of its own.
@@ -199,9 +226,7 @@ function build(view: EditorView): DecorationSet {
             return
           }
           default:
-            // An image still shows its markup: rendering it in place is the next
-            // slice, and hiding the markup now would leave only the alt text.
-            if (revealed || !INLINE_MARKS.has(name) || hasAncestor(node, 'Image')) return
+            if (revealed || !INLINE_MARKS.has(name)) return
             out.push(hidden.range(node.from, node.to))
         }
       },

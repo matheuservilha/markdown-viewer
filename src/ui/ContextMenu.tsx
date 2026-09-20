@@ -20,7 +20,11 @@ interface Props {
 
 export function ContextMenu({ x, y, items, onClose }: Props) {
   const menu = useRef<HTMLDivElement>(null)
-  const [placement, setPlacement] = useState<CSSProperties>({ left: x, top: y, visibility: 'hidden' })
+  const [placement, setPlacement] = useState<CSSProperties>({
+    left: x,
+    top: y,
+    visibility: 'hidden',
+  })
 
   // Measured and nudged back inside the window before it is shown, so a menu
   // opened near an edge never falls off it.
@@ -59,9 +63,9 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
       role="menu"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      {items.map((item, index) => (
+      {items.map((item) => (
         <button
-          key={index}
+          key={item.label}
           type="button"
           role="menuitem"
           className={

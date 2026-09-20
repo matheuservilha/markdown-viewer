@@ -8,12 +8,7 @@
 
 import { syntaxTree } from '@codemirror/language'
 import { StateField, type EditorState, type Range } from '@codemirror/state'
-import {
-  Decoration,
-  EditorView,
-  WidgetType,
-  type DecorationSet,
-} from '@codemirror/view'
+import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view'
 import { activeLines, overlaps } from './active'
 
 type Align = 'left' | 'center' | 'right'
@@ -76,7 +71,9 @@ export function parseTable(state: EditorState, from: number, to: number): Parsed
   const header = rows[0] ? { cells: splitRow(rows[0].text, rows[0].start) } : null
   const columns = header?.cells.length ?? 0
   const hasDelimiter = rows[1] !== undefined && DELIMITER_ROW.test(rows[1].text)
-  const align = hasDelimiter ? alignments(rows[1]!.text, columns) : Array<Align>(columns).fill('left')
+  const align = hasDelimiter
+    ? alignments(rows[1]!.text, columns)
+    : Array<Align>(columns).fill('left')
 
   const body = rows
     .slice(hasDelimiter ? 2 : 1)
@@ -152,13 +149,7 @@ class TableWidget extends WidgetType {
  * visits every inline node of the whole document on every keystroke and on every
  * step of a mouse selection.
  */
-const CONTAINERS = new Set([
-  'Document',
-  'Blockquote',
-  'BulletList',
-  'OrderedList',
-  'ListItem',
-])
+const CONTAINERS = new Set(['Document', 'Blockquote', 'BulletList', 'OrderedList', 'ListItem'])
 
 interface Span {
   from: number
@@ -189,11 +180,7 @@ function draw(state: EditorState, tables: Span[]): DecorationSet {
     decorations.push(
       Decoration.replace({
         block: true,
-        widget: new TableWidget(
-          state.doc.sliceString(table.from, table.to),
-          table.from,
-          table.to,
-        ),
+        widget: new TableWidget(state.doc.sliceString(table.from, table.to), table.from, table.to),
       }).range(table.from, table.to),
     )
   }

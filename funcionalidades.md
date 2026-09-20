@@ -34,13 +34,13 @@ Fora, por decisão:
 
 ## 3. Plataformas
 
-| Plataforma | Prioridade proposta | O que pesa nessa posição |
-|---|---|---|
-| macOS | 1 | é a plataforma de referência do visual |
-| Windows | 2 | mesma base de código do macOS |
-| Web | 3 | o acesso à pasta depende de API que hoje só o Chromium tem |
-| iOS e iPadOS | 4 | teclado de estilo e toque mudam o editor |
-| Android | 5 | teclado de estilo e toque mudam o editor |
+| Plataforma   | Prioridade proposta | O que pesa nessa posição                                   |
+| ------------ | ------------------- | ---------------------------------------------------------- |
+| macOS        | 1                   | é a plataforma de referência do visual                     |
+| Windows      | 2                   | mesma base de código do macOS                              |
+| Web          | 3                   | o acesso à pasta depende de API que hoje só o Chromium tem |
+| iOS e iPadOS | 4                   | teclado de estilo e toque mudam o editor                   |
+| Android      | 5                   | teclado de estilo e toque mudam o editor                   |
 
 O alvo é uma base de código só, com uma camada fina de sistema de arquivos por plataforma.
 A proposta técnica está na seção 8.
@@ -57,85 +57,85 @@ reconhecido e adiado. `Fora` é decisão de não fazer.
 
 ### 4.1 Editor e formatação
 
-| Funcionalidade do Bear | Decisão |
-|---|---|
-| Markdown seamless, sintaxe escondida | Entra. É o que define o produto |
-| Títulos de 1 a 6, com estilo próprio por nível | Entra |
-| Negrito, itálico, sublinhado, tachado, marca-texto, código inline | Entra |
-| Estilos combinados, como negrito dentro de marca-texto | Entra |
-| Bloco de código com realce por linguagem | Entra |
-| Citação | Entra |
-| Lista com marcador e lista numerada | Entra |
-| Tarefa `- [ ]`, marcar e desmarcar por atalho | Entra |
-| Separador horizontal | Entra |
-| Tabela, com criar, inserir e apagar linha e coluna | Entra |
-| Nota de rodapé | Entra |
-| Callout `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]` | Entra. A sintaxe é a mesma do GitHub |
-| Fórmula matemática, inline e em bloco | Depois. Fora da primeira versão |
-| Diagrama Mermaid | Depois. Fora da primeira versão |
-| Link comum `[texto](url)` | Entra |
-| Wiki link `[[arquivo]]` com autocompletar | Entra. Resolve para arquivo da base |
-| Prévia rica de link, com título e imagem | Fora. Exige rede, e o app é offline |
-| Prévia de PDF dentro da nota | Depois |
-| Imagem local, com redimensionar | Entra. Caminho relativo e absoluto |
-| GIF animado | Entra |
-| Desenho à mão com Apple Pencil | Fora |
-| Escanear documento pela câmera | Fora |
-| Seletor de emoji | Depois |
-| YAML front matter | Entra. Como bloco de propriedades, não como texto solto |
-| Dobrar título e lista | Entra |
-| Mover linha para cima e para baixo, indentar e desindentar | Entra |
-| Inserir data e hora por atalho | Depois |
-| Contador de palavras, caracteres e tempo de leitura | Entra |
-| Texto da direita para a esquerda, em árabe, hebraico e persa | Depois |
+| Funcionalidade do Bear                                                    | Decisão                                                 |
+| ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Markdown seamless, sintaxe escondida                                      | Entra. É o que define o produto                         |
+| Títulos de 1 a 6, com estilo próprio por nível                            | Entra                                                   |
+| Negrito, itálico, sublinhado, tachado, marca-texto, código inline         | Entra                                                   |
+| Estilos combinados, como negrito dentro de marca-texto                    | Entra                                                   |
+| Bloco de código com realce por linguagem                                  | Entra                                                   |
+| Citação                                                                   | Entra                                                   |
+| Lista com marcador e lista numerada                                       | Entra                                                   |
+| Tarefa `- [ ]`, marcar e desmarcar por atalho                             | Entra                                                   |
+| Separador horizontal                                                      | Entra                                                   |
+| Tabela, com criar, inserir e apagar linha e coluna                        | Entra                                                   |
+| Nota de rodapé                                                            | Entra                                                   |
+| Callout `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]` | Entra. A sintaxe é a mesma do GitHub                    |
+| Fórmula matemática, inline e em bloco                                     | Depois. Fora da primeira versão                         |
+| Diagrama Mermaid                                                          | Depois. Fora da primeira versão                         |
+| Link comum `[texto](url)`                                                 | Entra                                                   |
+| Wiki link `[[arquivo]]` com autocompletar                                 | Entra. Resolve para arquivo da base                     |
+| Prévia rica de link, com título e imagem                                  | Fora. Exige rede, e o app é offline                     |
+| Prévia de PDF dentro da nota                                              | Depois                                                  |
+| Imagem local, com redimensionar                                           | Entra. Caminho relativo e absoluto                      |
+| GIF animado                                                               | Entra                                                   |
+| Desenho à mão com Apple Pencil                                            | Fora                                                    |
+| Escanear documento pela câmera                                            | Fora                                                    |
+| Seletor de emoji                                                          | Depois                                                  |
+| YAML front matter                                                         | Entra. Como bloco de propriedades, não como texto solto |
+| Dobrar título e lista                                                     | Entra                                                   |
+| Mover linha para cima e para baixo, indentar e desindentar                | Entra                                                   |
+| Inserir data e hora por atalho                                            | Depois                                                  |
+| Contador de palavras, caracteres e tempo de leitura                       | Entra                                                   |
+| Texto da direita para a esquerda, em árabe, hebraico e persa              | Depois                                                  |
 
 ### 4.2 Organização
 
-| Funcionalidade do Bear | Decisão |
-|---|---|
-| Tag aninhada com `#` | Depois. A primeira versão organiza só por pasta |
-| Tag em qualquer lugar do texto, inclusive no título | Depois |
-| Ícone por tag, as TagCons | Depois |
-| Fixar tag na barra lateral | Depois |
-| Renomear e apagar tag em toda a base | Depois. É reescrita em massa de arquivos |
-| Tag como espaço de trabalho | Fora |
-| Fixar nota no topo | Entra. Vira favorito, guardado fora do arquivo |
-| Arquivar nota | Fora. Mover para outra pasta resolve |
-| Lixeira própria | Fora. Usa a lixeira do sistema operacional |
-| Lista de notas com ordenação, tamanho de prévia e miniatura de anexo | Entra |
+| Funcionalidade do Bear                                               | Decisão                                         |
+| -------------------------------------------------------------------- | ----------------------------------------------- |
+| Tag aninhada com `#`                                                 | Depois. A primeira versão organiza só por pasta |
+| Tag em qualquer lugar do texto, inclusive no título                  | Depois                                          |
+| Ícone por tag, as TagCons                                            | Depois                                          |
+| Fixar tag na barra lateral                                           | Depois                                          |
+| Renomear e apagar tag em toda a base                                 | Depois. É reescrita em massa de arquivos        |
+| Tag como espaço de trabalho                                          | Fora                                            |
+| Fixar nota no topo                                                   | Entra. Vira favorito, guardado fora do arquivo  |
+| Arquivar nota                                                        | Fora. Mover para outra pasta resolve            |
+| Lixeira própria                                                      | Fora. Usa a lixeira do sistema operacional      |
+| Lista de notas com ordenação, tamanho de prévia e miniatura de anexo | Entra                                           |
 
 ### 4.3 Navegação
 
-| Funcionalidade do Bear | Decisão |
-|---|---|
-| Sumário ao vivo pelos títulos | Entra |
-| Backlinks, quem aponta para este arquivo | Entra. Exige índice da base |
-| Painel lateral de informações, em abas | Entra |
-| Esconder barra lateral e lista, em três modos de janela | Entra |
-| Nota em janela separada | Depois |
-| Voltar e avançar no histórico | Entra |
-| Abertura rápida por nome, no estilo do `⌘O` | Entra |
+| Funcionalidade do Bear                                  | Decisão                     |
+| ------------------------------------------------------- | --------------------------- |
+| Sumário ao vivo pelos títulos                           | Entra                       |
+| Backlinks, quem aponta para este arquivo                | Entra. Exige índice da base |
+| Painel lateral de informações, em abas                  | Entra                       |
+| Esconder barra lateral e lista, em três modos de janela | Entra                       |
+| Nota em janela separada                                 | Depois                      |
+| Voltar e avançar no histórico                           | Entra                       |
+| Abertura rápida por nome, no estilo do `⌘O`             | Entra                       |
 
 ### 4.4 Busca
 
-| Funcionalidade do Bear | Decisão |
-|---|---|
-| Busca na lista de notas, por conteúdo | Entra. Com painel de resultados no estilo do `⇧⌘F` do VS Code |
-| Busca dentro do arquivo aberto | Entra |
-| Buscar e substituir | Entra |
-| Operador especial `@untagged`, `@images`, `@files`, `@todo`, `@done` | Depois. O equivalente aqui seria por extensão, pasta e data |
-| Ler texto dentro de imagem e de PDF | Fora |
+| Funcionalidade do Bear                                               | Decisão                                                       |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Busca na lista de notas, por conteúdo                                | Entra. Com painel de resultados no estilo do `⇧⌘F` do VS Code |
+| Busca dentro do arquivo aberto                                       | Entra                                                         |
+| Buscar e substituir                                                  | Entra                                                         |
+| Operador especial `@untagged`, `@images`, `@files`, `@todo`, `@done` | Depois. O equivalente aqui seria por extensão, pasta e data   |
+| Ler texto dentro de imagem e de PDF                                  | Fora                                                          |
 
 ### 4.5 Aparência
 
-| Funcionalidade do Bear | Decisão |
-|---|---|
-| Biblioteca de temas, que no Bear passa de 28 | Entra. Dois na primeira versão, claro e escuro |
-| Ícone do app alternativo | Fora |
-| Escolher fonte do texto, do título e do código | Entra |
-| Tamanho da fonte, altura da linha e largura da coluna | Entra |
-| Espaçamento e recuo de parágrafo | Entra |
-| Modo somente leitura | Entra |
+| Funcionalidade do Bear                                | Decisão                                        |
+| ----------------------------------------------------- | ---------------------------------------------- |
+| Biblioteca de temas, que no Bear passa de 28          | Entra. Dois na primeira versão, claro e escuro |
+| Ícone do app alternativo                              | Fora                                           |
+| Escolher fonte do texto, do título e do código        | Entra                                          |
+| Tamanho da fonte, altura da linha e largura da coluna | Entra                                          |
+| Espaçamento e recuo de parágrafo                      | Entra                                          |
+| Modo somente leitura                                  | Entra                                          |
 
 Duas funcionalidades que vêm do iA Writer e eu proponho incluir: o modo foco, que escurece
 o que não está sendo editado, e o modo máquina de escrever, que mantém a linha do cursor
@@ -143,15 +143,15 @@ centralizada.
 
 ### 4.6 Saída
 
-| Funcionalidade do Bear | Decisão |
-|---|---|
-| Exportar Markdown e TXT | Entra. É copiar o arquivo |
-| Exportar HTML | Entra |
-| Exportar PDF | Entra |
-| Imprimir | Entra |
-| Exportar RTF, DOCX, ePub, JPG e TextBundle | Depois |
-| Copiar link para a nota | Entra. Copia o caminho, absoluto ou relativo, como no VS Code |
-| Publicar em blog | Fora |
+| Funcionalidade do Bear                     | Decisão                                                       |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| Exportar Markdown e TXT                    | Entra. É copiar o arquivo                                     |
+| Exportar HTML                              | Entra                                                         |
+| Exportar PDF                               | Entra                                                         |
+| Imprimir                                   | Entra                                                         |
+| Exportar RTF, DOCX, ePub, JPG e TextBundle | Depois                                                        |
+| Copiar link para a nota                    | Entra. Copia o caminho, absoluto ou relativo, como no VS Code |
+| Publicar em blog                           | Fora                                                          |
 
 ### 4.7 Infraestrutura do Bear que não se aplica
 
@@ -251,23 +251,23 @@ por evento do sistema de arquivos, sem varrer a pasta de novo.
 
 O texto no disco é sempre Markdown puro. O que muda é só o desenho na tela.
 
-| Situação | Comportamento |
-|---|---|
-| Cursor fora do trecho | a marcação some e o estilo fica, então `**bom**` vira **bom** |
-| Cursor entra na linha | a marcação daquele trecho reaparece, e a linha não muda de altura |
-| Seleção atravessa o trecho | mesmo comportamento da linha ativa |
-| Título | o `#` some, o tamanho e o peso ficam, e o texto não muda de lugar |
-| Link | mostra só o texto, clicável com tecla de modificador, e revela a URL ao entrar |
-| Imagem | renderiza no lugar, e mostra o código ao entrar na linha |
-| Tabela | renderiza como grade, e vira texto alinhado e editável ao entrar |
-| Bloco de código | fica sempre visível como bloco, com realce e cerca discreta |
-| Lista e tarefa | marcador desenhado, caixa clicável, recuo por nível |
-| Citação e callout | barra e caixa desenhadas, e o `>` some |
-| YAML front matter | bloco fechado no topo, expansível |
-| Desfazer | uma ação da pessoa desfaz de uma vez, sem passo intermediário |
-| Colar HTML | vira Markdown |
-| Colar URL sobre texto selecionado | vira link |
-| Digitar `- ` no começo da linha | vira lista na hora, e apagar desfaz |
+| Situação                          | Comportamento                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| Cursor fora do trecho             | a marcação some e o estilo fica, então `**bom**` vira **bom**                  |
+| Cursor entra na linha             | a marcação daquele trecho reaparece, e a linha não muda de altura              |
+| Seleção atravessa o trecho        | mesmo comportamento da linha ativa                                             |
+| Título                            | o `#` some, o tamanho e o peso ficam, e o texto não muda de lugar              |
+| Link                              | mostra só o texto, clicável com tecla de modificador, e revela a URL ao entrar |
+| Imagem                            | renderiza no lugar, e mostra o código ao entrar na linha                       |
+| Tabela                            | renderiza como grade, e vira texto alinhado e editável ao entrar               |
+| Bloco de código                   | fica sempre visível como bloco, com realce e cerca discreta                    |
+| Lista e tarefa                    | marcador desenhado, caixa clicável, recuo por nível                            |
+| Citação e callout                 | barra e caixa desenhadas, e o `>` some                                         |
+| YAML front matter                 | bloco fechado no topo, expansível                                              |
+| Desfazer                          | uma ação da pessoa desfaz de uma vez, sem passo intermediário                  |
+| Colar HTML                        | vira Markdown                                                                  |
+| Colar URL sobre texto selecionado | vira link                                                                      |
+| Digitar `- ` no começo da linha   | vira lista na hora, e apagar desfaz                                            |
 
 Seis erros conhecidos de implementação que não podem acontecer:
 
@@ -332,15 +332,15 @@ dele se aprende comportamento observado, não fonte.
 As decisões por funcionalidade estão nas tabelas da seção 4. Aqui ficam as sete que
 atravessam o produto inteiro:
 
-| Decisão | O que ficou |
-|---|---|
-| Por onde começar | macOS, e o Tauri leva o Windows logo depois |
-| Editar ou só ler | edita e salva desde a primeira versão |
-| Quem manda no visual | copiar o Bear de perto |
-| Dialeto do Markdown | GitHub Flavored, mais callout, marca-texto e sublinhado do Bear |
-| Árvore, arquivo solto e abas | copiar o Explorer do VS Code |
-| Temas na primeira versão | dois, claro e escuro, com o motor pronto para o terceiro |
-| Arquivo `.txt` | abre como texto puro, sem interpretar Markdown |
+| Decisão                      | O que ficou                                                     |
+| ---------------------------- | --------------------------------------------------------------- |
+| Por onde começar             | macOS, e o Tauri leva o Windows logo depois                     |
+| Editar ou só ler             | edita e salva desde a primeira versão                           |
+| Quem manda no visual         | copiar o Bear de perto                                          |
+| Dialeto do Markdown          | GitHub Flavored, mais callout, marca-texto e sublinhado do Bear |
+| Árvore, arquivo solto e abas | copiar o Explorer do VS Code                                    |
+| Temas na primeira versão     | dois, claro e escuro, com o motor pronto para o terceiro        |
+| Arquivo `.txt`               | abre como texto puro, sem interpretar Markdown                  |
 
 O que não é arquivo (favoritos, tema, sessão e abas abertas) fica fora da base, na pasta de
 suporte do sistema. A pasta do usuário não recebe nenhum arquivo nosso.

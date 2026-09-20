@@ -7,7 +7,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import {
   copyFile,
   mkdir,
@@ -37,7 +37,7 @@ import {
 import { decode } from './text'
 
 function basename(path: string): string {
-  return path.split('/').filter(Boolean).pop() ?? path
+  return path.split('/').findLast(Boolean) ?? path
 }
 
 export class TauriFileSystem implements FileSystem {
@@ -107,10 +107,22 @@ export class TauriFileSystem implements FileSystem {
           kind: entry.isDirectory ? ('directory' as const) : ('file' as const),
         }
       })
-      .sort(compareEntries)
+      .toSorted(compareEntries)
   }
 
   readonly can: Capabilities = { trash: true, reveal: true, absolutePath: true }
+
+  async readBinary(baseId: string, path: string): Promise<Uint8Array> {
+    return readFile(this.absolute(baseId, path))
+  }
+
+  async saveAs(suggestedName: string, bytes: Uint8Array<ArrayBuffer>): Promise<string | null> {
+    const target = await save({ defaultPath: suggestedName })
+    if (!target) return null
+    await invoke('allow_base', { path: target })
+    await writeFile(target, bytes)
+    return target
+  }
 
   async createFile(baseId: string, path: string): Promise<Entry> {
     await writeTextFile(this.absolute(baseId, path), '')

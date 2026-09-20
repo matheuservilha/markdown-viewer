@@ -60,9 +60,7 @@ export interface LooseFile {
  * only allowed from inside a click. The desktop never returns it.
  */
 export type Restored<T> =
-  | { status: 'ok'; value: T }
-  | { status: 'needs-permission' }
-  | { status: 'gone' }
+  { status: 'ok'; value: T } | { status: 'needs-permission' } | { status: 'gone' }
 
 export interface FileSystem {
   /** Asks the person for a folder and adds it as a base. */
@@ -79,6 +77,10 @@ export interface FileSystem {
   /** Direct children of `path` inside `base`, already sorted. */
   list(baseId: string, path: string): Promise<Entry[]>
   read(baseId: string, path: string): Promise<LoadedFile>
+  /** The raw bytes, for the files that are not text: images and the like. */
+  readBinary(baseId: string, path: string): Promise<Uint8Array>
+  /** Asks where to put a new file and writes it. Null when nobody chose. */
+  saveAs(suggestedName: string, bytes: Uint8Array<ArrayBuffer>): Promise<string | null>
 
   /** Creates an empty file and hands back its entry. */
   createFile(baseId: string, path: string): Promise<Entry>

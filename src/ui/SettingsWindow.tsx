@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
-import {
-  FONT_LABELS,
-  LIMITS,
-  type BodyFont,
-  type Settings,
-  type ThemeMode,
-} from '~/app/settings'
+import { FONT_LABELS, LIMITS, type BodyFont, type Settings, type ThemeMode } from '~/app/settings'
 import { CloseIcon, GripIcon } from './icons'
 
 const POSITION_KEY = 'markdown-viewer.settings.position'

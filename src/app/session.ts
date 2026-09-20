@@ -56,5 +56,5 @@ export function saveSession(session: Session): void {
 
 /** Shallow folders first, so a child is never expanded before its parent. */
 export function byDepth(entryIds: string[]): string[] {
-  return [...entryIds].sort((a, b) => a.split('/').length - b.split('/').length)
+  return entryIds.toSorted((a, b) => a.split('/').length - b.split('/').length)
 }

@@ -7,6 +7,7 @@ import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, drawSelection, keymap, rectangularSelection } from '@codemirror/view'
 import { toggleTask } from './commands'
 import { dialect } from './dialect'
+import { documentSource } from './images'
 import { frontmatterBlock } from './frontmatter'
 import { seamlessMarkdown } from './seamless'
 import { tableBlocks } from './tables'
@@ -26,13 +27,23 @@ export function readOnlyExtension(readOnly: boolean): Extension {
 export interface EditorOptions {
   /** Shown as the heading of the page. It is the file name, not document text. */
   title: string
+  /** Which file this is, so an image beside it can be found. */
+  baseId: string
+  path: string
   /** A `.txt` file opens as plain text, with no Markdown parsing at all. */
   plainText: boolean
   readOnly: boolean
   onSave: () => void
 }
 
-export function editorExtensions({ title, plainText, readOnly, onSave }: EditorOptions): Extension[] {
+export function editorExtensions({
+  title,
+  baseId,
+  path,
+  plainText,
+  readOnly,
+  onSave,
+}: EditorOptions): Extension[] {
   return [
     history(),
     drawSelection(),
@@ -53,6 +64,7 @@ export function editorExtensions({ title, plainText, readOnly, onSave }: EditorO
     ]),
     editorTheme,
     documentTitle(title),
+    documentSource.of({ baseId, path }),
     ...(plainText
       ? [EditorView.theme({ '.cm-content': { fontFamily: 'var(--font-mono)' } })]
       : [

@@ -8,9 +8,12 @@ import { tags as t, Tag } from '@lezer/highlight'
 
 export const highlightTag = Tag.define()
 export const wikilinkTag = Tag.define()
+export const footnoteTag = Tag.define()
 
 const EQUALS = 61 // '='
 const BRACKET = 91 // '['
+const BANG = 33 // '!'
+const CARET = 94 // '^'
 
 // One object, defined once: the parser matches the closing delimiter against the
 // opening one by identity, so a fresh literal per call would never close.
@@ -82,4 +85,65 @@ const Wikilink: MarkdownConfig = {
   ],
 }
 
-export const dialect = [GFM, Highlight, Wikilink]
+/** `![[arquivo.png]]`, the wiki-style embed. */
+const Embed: MarkdownConfig = {
+  defineNodes: [
+    { name: 'Embed' },
+    { name: 'EmbedMark', style: t.processingInstruction },
+    { name: 'EmbedTarget' },
+  ],
+  parseInline: [
+    {
+      name: 'Embed',
+      before: 'Image',
+      parse(cx, next, pos) {
+        if (next !== BANG || cx.char(pos + 1) !== BRACKET || cx.char(pos + 2) !== BRACKET) return -1
+        const closing = cx.text.indexOf(']]', pos - cx.offset + 3)
+        if (closing < 0) return -1
+        const end = cx.offset + closing + 2
+        return cx.addElement(
+          cx.elt('Embed', pos, end, [
+            cx.elt('EmbedMark', pos, pos + 3),
+            cx.elt('EmbedTarget', pos + 3, end - 2),
+            cx.elt('EmbedMark', end - 2, end),
+          ]),
+        )
+      },
+    },
+  ],
+}
+
+/**
+ * Footnote references, `[^1]`. The definition line is left to the block parser
+ * as an ordinary paragraph and picked up by the decorations, which is enough to
+ * draw it apart without a second block grammar.
+ */
+const Footnote: MarkdownConfig = {
+  defineNodes: [
+    { name: 'FootnoteRef', style: footnoteTag },
+    { name: 'FootnoteMark', style: t.processingInstruction },
+    { name: 'FootnoteLabel' },
+  ],
+  parseInline: [
+    {
+      name: 'FootnoteRef',
+      before: 'Link',
+      parse(cx, next, pos) {
+        if (next !== BRACKET || cx.char(pos + 1) !== CARET) return -1
+        const closing = cx.text.indexOf(']', pos - cx.offset + 2)
+        if (closing < 0) return -1
+        const end = cx.offset + closing + 1
+        if (end - pos > 64) return -1
+        return cx.addElement(
+          cx.elt('FootnoteRef', pos, end, [
+            cx.elt('FootnoteMark', pos, pos + 2),
+            cx.elt('FootnoteLabel', pos + 2, end - 1),
+            cx.elt('FootnoteMark', end - 1, end),
+          ]),
+        )
+      },
+    },
+  ],
+}
+
+export const dialect = [GFM, Highlight, Wikilink, Embed, Footnote]

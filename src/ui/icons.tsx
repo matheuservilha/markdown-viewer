@@ -166,3 +166,11 @@ export const CrosshairIcon = (p: IconProps) => (
     <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
   </Icon>
 )
+
+export const MoreIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="6" cy="12" r="1.1" />
+    <circle cx="12" cy="12" r="1.1" />
+    <circle cx="18" cy="12" r="1.1" />
+  </Icon>
+)

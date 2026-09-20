@@ -21,7 +21,7 @@ export const Breadcrumbs = memo(function Breadcrumbs({ tab, base }: Props) {
   return (
     <nav className="crumbs" aria-label="Caminho do arquivo" title={tab.path}>
       {folders.map((folder, index) => (
-        <span key={index} className="crumb">
+        <span key={folders.slice(0, index + 1).join('/')} className="crumb">
           {index > 0 && (
             <span className="crumb-sep" aria-hidden="true">
               /

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadSession, saveSession, type Session, type ViewState } from '~/app/session'
 import { useSettings } from '~/app/settings'
-import { useWorkspace } from '~/app/store'
+import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, parentPath, type Entry } from '~/platform/fs'
+import { exportDocument } from '~/editor/export-html'
 import { fileSystem, platform } from '~/platform'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
@@ -12,6 +13,7 @@ import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { MeasureGuides } from './MeasureGuides'
 import { SettingsWindow } from './SettingsWindow'
 import { SidebarResizer } from './SidebarResizer'
+import { printHtml } from './print'
 import { StatusBar } from './StatusBar'
 import { Tabs } from './Tabs'
 import {
@@ -22,6 +24,7 @@ import {
   EyeIcon,
   FilePlusIcon,
   FolderPlusIcon,
+  MoreIcon,
   MoonIcon,
   SearchIcon,
   SettingsIcon,
@@ -37,11 +40,12 @@ export function App() {
   const { state, actions } = useWorkspace()
   const { settings, update, reset } = useSettings()
   const theme = useResolvedTheme(settings.themeMode)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => loadSession()?.sidebarOpen ?? true)
   const [showAllFiles, setShowAllFiles] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [measuring, setMeasuring] = useState(false)
-  const [menu, setMenu] = useState<{ entry: Entry; x: number; y: number } | null>(null)
+  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number } | null>(null)
+  const restore = actions.restoreSession
   const [renamingId, setRenamingId] = useState<string | null>(null)
 
   // Only the four slices the tree reads, so that typing in a document does not
@@ -81,22 +85,6 @@ export function App() {
       setRenamingId(entry.id)
     },
     [actions],
-  )
-
-  const tree: TreeHandlers = useMemo(
-    () => ({
-      onToggleFolder: toggleFolder,
-      onOpenFile: openFile,
-      onContextMenu: (entry, x, y) => setMenu({ entry, x, y }),
-      onStartRename: (entry) => setRenamingId(entry.id),
-      onRename: (entry, name) => {
-        setRenamingId(null)
-        void actions.renameEntry(entry, name)
-      },
-      onCancelRename: () => setRenamingId(null),
-      onTrash: (entry) => void actions.trashEntry(entry),
-    }),
-    [actions, openFile, toggleFolder],
   )
 
   const menuItems = useCallback(
@@ -147,6 +135,74 @@ export function App() {
     [actions, createIn],
   )
 
+  const tree: TreeHandlers = useMemo(
+    () => ({
+      onToggleFolder: toggleFolder,
+      onOpenFile: openFile,
+      onContextMenu: (entry, x, y) => setMenu({ items: menuItems(entry), x, y }),
+      onStartRename: (entry) => setRenamingId(entry.id),
+      onRename: (entry, name) => {
+        setRenamingId(null)
+        void actions.renameEntry(entry, name)
+      },
+      onCancelRename: () => setRenamingId(null),
+      onTrash: (entry) => void actions.trashEntry(entry),
+    }),
+    [actions, menuItems, openFile, toggleFolder],
+  )
+
+  /**
+   * What can be done with the file that is open. The export runs from the text
+   * in memory rather than from disk, so what leaves is what is on screen, even
+   * before autosave has caught up.
+   */
+  const documentMenu = useCallback((): MenuItem[] => {
+    const tab = latestTab.current
+    const doc = tab ? latestDoc.current : null
+    if (!tab || !doc) return []
+
+    const files = fileSystem()
+    const source = { baseId: tab.baseId, path: tab.path }
+    const entry: Entry = {
+      id: tab.id,
+      baseId: tab.baseId,
+      path: tab.path,
+      name: tab.name,
+      kind: 'file' as const,
+    }
+    const copy = (text: string) => void navigator.clipboard.writeText(text)
+    const html = () => exportDocument(tab.name.replace(/\.[^.]+$/, ''), doc.text, source)
+
+    return [
+      {
+        label: 'Exportar HTML',
+        onSelect: () => {
+          void html().then((page) =>
+            files.saveAs(
+              tab.name.replace(/\.[^.]+$/, '') + '.html',
+              new TextEncoder().encode(page),
+            ),
+          )
+        },
+      },
+      {
+        label: 'Imprimir ou salvar PDF',
+        hint: '⌘P',
+        onSelect: () => void html().then(printHtml),
+      },
+      {
+        label: 'Copiar caminho',
+        separated: true,
+        disabled: !files.can.absolutePath,
+        onSelect: () => copy(tab.label ?? files.absolutePath(tab.baseId, tab.path) ?? tab.path),
+      },
+      { label: 'Copiar caminho relativo', onSelect: () => copy(tab.path) },
+      ...(files.can.reveal
+        ? [{ label: 'Revelar no Finder', onSelect: () => void actions.revealEntry(entry) }]
+        : []),
+    ]
+  }, [actions])
+
   /** Opens every folder down to the file that is on screen, and scrolls to it. */
   const revealActive = useCallback(async () => {
     const tab = latestTab.current
@@ -161,13 +217,22 @@ export function App() {
 
   const activeTab = state.tabs.find((tab) => tab.id === state.activeId) ?? null
   const activeDoc = state.activeId ? (state.docs[state.activeId] ?? null) : null
-  const latestTab = useRef(activeTab)
-  latestTab.current = activeTab
+  // Read from callbacks that must not change identity on every keystroke. The
+  // assignment happens after the commit, which is the only moment React allows
+  // a ref to be written.
+  const latestTab = useRef<Tab | null>(null)
+  const latestDoc = useRef<Doc | null>(null)
+  useEffect(() => {
+    // React allows writing a ref from an effect; the rule does not tell that
+    // apart from writing one while rendering, which is the real hazard.
+    // oxlint-disable-next-line immutability
+    latestTab.current = activeTab
+    // oxlint-disable-next-line immutability
+    latestDoc.current = activeDoc
+  })
 
   // Reopen last session once, before anything else touches the workspace.
   const previous = useRef<Session | null>(null)
-  const restoreRef = useRef(actions.restoreSession)
-  restoreRef.current = actions.restoreSession
   const restoreStarted = useRef(false)
   useEffect(() => {
     // Development runs effects twice, and reopening a session is not something
@@ -178,12 +243,11 @@ export function App() {
     const session = loadSession()
     if (!session) return
     previous.current = session
-    setSidebarOpen(session.sidebarOpen)
     views.current = Object.fromEntries(
       session.tabs.flatMap((tab) => (tab.view ? [[tab.id, tab.view]] : [])),
     )
-    void restoreRef.current(session, false)
-  }, [])
+    void restore(session, false)
+  }, [restore])
 
   /**
    * Whatever could not be reopened is carried over untouched. Without this, a
@@ -238,17 +302,19 @@ export function App() {
   }, [actions, state.activeId])
 
   // Autosave: a short pause in the typing writes the file.
-  const saveRef = useRef(saveActive)
-  saveRef.current = saveActive
   useEffect(() => {
-    if (!activeDoc?.dirty || activeDoc.conflict) return
-    const timer = window.setTimeout(() => saveRef.current(), AUTOSAVE_DELAY)
+    // The text is read so that every keystroke restarts the wait: that is the
+    // whole point of the delay, not an accident of the dependency list.
+    if (!activeDoc) return
+    const { text, dirty, conflict } = activeDoc
+    if (text === undefined || !dirty || conflict) return
+    const timer = window.setTimeout(saveActive, AUTOSAVE_DELAY)
     return () => window.clearTimeout(timer)
-  }, [activeDoc?.text, activeDoc?.dirty, activeDoc?.conflict])
+  }, [activeDoc, saveActive])
 
   // Saving on blur, and looking for changes made behind our back on focus.
   useEffect(() => {
-    const onBlur = () => saveRef.current()
+    const onBlur = () => saveActive()
     const onFocus = () => void actions.checkExternalChanges()
     window.addEventListener('blur', onBlur)
     window.addEventListener('focus', onFocus)
@@ -256,7 +322,7 @@ export function App() {
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('focus', onFocus)
     }
-  }, [actions])
+  }, [actions, saveActive])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -273,10 +339,16 @@ export function App() {
         event.preventDefault()
         setSettingsOpen((open) => !open)
       }
+      if (event.key === 'p' && state.activeId) {
+        // The browser would otherwise print the interface itself.
+        event.preventDefault()
+        const item = documentMenu().find((entry) => entry.label.startsWith('Imprimir'))
+        item?.onSelect()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [actions, state.activeId])
+  }, [actions, documentMenu, state.activeId])
 
   const dark = theme === 'dark'
 
@@ -302,11 +374,7 @@ export function App() {
             <FolderPlusIcon />
             Abrir pasta
           </button>
-          <button
-            type="button"
-            className="nav-action"
-            onClick={() => void actions.openLooseFile()}
-          >
+          <button type="button" className="nav-action" onClick={() => void actions.openLooseFile()}>
             <FilePlusIcon />
             Abrir arquivo
           </button>
@@ -485,6 +553,20 @@ export function App() {
                 {activeDoc.dirty ? 'Não salvo' : 'Salvo'}
               </span>
             )}
+            {activeDoc && (
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Ações do documento"
+                title="Ações do documento"
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect()
+                  setMenu({ items: documentMenu(), x: box.right - 4, y: box.bottom + 4 })
+                }}
+              >
+                <MoreIcon size={16} />
+              </button>
+            )}
           </header>
         )}
 
@@ -495,7 +577,7 @@ export function App() {
               tab={activeTab}
               doc={activeDoc}
               readOnly={activeDoc.shape.lossy || settings.readOnly}
-              initialView={views.current[activeTab.id]}
+              getInitialView={() => views.current[activeTab.id]}
               onViewChange={(view) => {
                 views.current = { ...views.current, [activeTab.id]: view }
                 persist()
@@ -521,12 +603,7 @@ export function App() {
       </main>
 
       {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={menuItems(menu.entry)}
-          onClose={() => setMenu(null)}
-        />
+        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
       )}
 
       {settingsOpen && (

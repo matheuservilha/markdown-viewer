@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { fileSystem } from '~/platform'
 import { byDepth, type Session, type SessionTab } from './session'
 import {
@@ -126,7 +126,12 @@ function reducer(state: State, action: Action): State {
       const docs = { ...state.docs }
       delete docs[action.id]
       const fallback = tabs[Math.min(index, tabs.length - 1)]?.id ?? null
-      return { ...state, tabs, docs, activeId: state.activeId === action.id ? fallback : state.activeId }
+      return {
+        ...state,
+        tabs,
+        docs,
+        activeId: state.activeId === action.id ? fallback : state.activeId,
+      }
     }
 
     case 'tab/activated':
@@ -152,7 +157,10 @@ function reducer(state: State, action: Action): State {
       if (!doc) return state
       return {
         ...state,
-        docs: { ...state.docs, [action.id]: { ...doc, dirty: false, conflict: false, version: action.version } },
+        docs: {
+          ...state.docs,
+          [action.id]: { ...doc, dirty: false, conflict: false, version: action.version },
+        },
       }
     }
 
@@ -237,7 +245,9 @@ export function useWorkspace() {
    * callbacks, and they all render again for nothing.
    */
   const latest = useRef(state)
-  latest.current = state
+  useEffect(() => {
+    latest.current = state
+  })
 
   const report = useCallback((error: unknown) => {
     dispatch({ type: 'error/set', message: error instanceof Error ? error.message : String(error) })
@@ -332,7 +342,11 @@ export function useWorkspace() {
       const doc = latest.current.docs[id]
       if (!tab || !doc || !doc.dirty) return
       if (doc.shape.lossy) {
-        report(new Error('Arquivo não é UTF-8. Aberto somente para leitura para não corromper os bytes.'))
+        report(
+          new Error(
+            'Arquivo não é UTF-8. Aberto somente para leitura para não corromper os bytes.',
+          ),
+        )
         return
       }
       try {

@@ -42,7 +42,9 @@ export class BrowserFileSystem implements FileSystem {
 
   async openBase(): Promise<Base | null> {
     if (!supportsDirectoryPicker()) {
-      throw new Error('Este navegador não abre uma pasta. Use um navegador Chromium ou o app de desktop.')
+      throw new Error(
+        'Este navegador não abre uma pasta. Use um navegador Chromium ou o app de desktop.',
+      )
     }
     let root: FileSystemDirectoryHandle
     try {
@@ -106,7 +108,9 @@ export class BrowserFileSystem implements FileSystem {
 
   async openFile(): Promise<LooseFile | null> {
     if (!('showOpenFilePicker' in window)) {
-      throw new Error('Este navegador não abre arquivo. Use um navegador Chromium ou o app de desktop.')
+      throw new Error(
+        'Este navegador não abre arquivo. Use um navegador Chromium ou o app de desktop.',
+      )
     }
 
     let handles: FileSystemFileHandle[]
@@ -151,7 +155,7 @@ export class BrowserFileSystem implements FileSystem {
         kind: handle.kind === 'directory' ? 'directory' : 'file',
       })
     }
-    return entries.sort(compareEntries)
+    return entries.toSorted(compareEntries)
   }
 
   async read(baseId: string, path: string): Promise<LoadedFile> {
@@ -171,6 +175,36 @@ export class BrowserFileSystem implements FileSystem {
   }
 
   readonly can: Capabilities = { trash: false, reveal: false, absolutePath: false }
+
+  async readBinary(baseId: string, path: string): Promise<Uint8Array> {
+    const file = await (await this.fileAt(this.require(baseId), path)).getFile()
+    return new Uint8Array(await file.arrayBuffer())
+  }
+
+  async saveAs(suggestedName: string, bytes: Uint8Array<ArrayBuffer>): Promise<string | null> {
+    if (!('showSaveFilePicker' in window)) {
+      // Without the picker the browser can still hand the file to the person
+      // through an ordinary download.
+      const url = URL.createObjectURL(new Blob([bytes]))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = suggestedName
+      anchor.click()
+      URL.revokeObjectURL(url)
+      return suggestedName
+    }
+
+    let handle: FileSystemFileHandle
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName })
+    } catch {
+      return null
+    }
+    const writable = await handle.createWritable()
+    await writable.write(bytes)
+    await writable.close()
+    return handle.name
+  }
 
   async createFile(baseId: string, path: string): Promise<Entry> {
     const open = this.require(baseId)
@@ -201,7 +235,9 @@ export class BrowserFileSystem implements FileSystem {
     if (typeof movable.move === 'function') {
       await movable.move(target, baseName(to))
     } else if (handle.kind === 'file') {
-      const bytes = new Uint8Array(await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer())
+      const bytes = new Uint8Array(
+        await (await (handle as FileSystemFileHandle).getFile()).arrayBuffer(),
+      )
       await this.writeInto(target, baseName(to), bytes)
       await (await this.directoryAt(open, parentPath(from))).removeEntry(baseName(from))
     } else {
@@ -267,7 +303,9 @@ export class BrowserFileSystem implements FileSystem {
 
   /** Drops a path and everything under it from the handle cache. */
   private forget(open: OpenBase, path: string): void {
-    for (const key of [...open.handles.keys()]) {
+    // Deleting from a Map while walking it is defined behaviour: the entries
+    // already passed stay passed, and nothing new is added here.
+    for (const key of open.handles.keys()) {
       if (key === path || key.startsWith(path + '/')) open.handles.delete(key)
     }
   }

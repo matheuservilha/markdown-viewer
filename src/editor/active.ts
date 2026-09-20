@@ -27,7 +27,9 @@ export function overlaps(spans: LineSpan[], from: number, to: number): boolean {
 }
 
 export function sameLines(a: LineSpan[], b: LineSpan[]): boolean {
-  return a.length === b.length && a.every((span, i) => span.from === b[i]!.from && span.to === b[i]!.to)
+  return (
+    a.length === b.length && a.every((span, i) => span.from === b[i]!.from && span.to === b[i]!.to)
+  )
 }
 
 /** True when the cursor or selection is inside the given range. */

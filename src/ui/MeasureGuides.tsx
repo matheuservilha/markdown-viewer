@@ -18,10 +18,7 @@ export function MeasureGuides({ active }: { active: boolean }) {
   const [edges, setEdges] = useState<Edges | null>(null)
 
   useEffect(() => {
-    if (!active) {
-      setEdges(null)
-      return
-    }
+    if (!active) return
     let frame = 0
     const tick = () => {
       const content = document.querySelector('.cm-content')
@@ -39,7 +36,9 @@ export function MeasureGuides({ active }: { active: boolean }) {
     return () => cancelAnimationFrame(frame)
   }, [active])
 
-  if (!edges) return null
+  // The guides are derived from `active` rather than cleared in the effect, so
+  // switching them off does not schedule another render.
+  if (!active || !edges) return null
 
   return (
     <div className="measure-guides" aria-hidden="true">
