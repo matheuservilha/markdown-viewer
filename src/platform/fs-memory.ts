@@ -315,6 +315,11 @@ export class MemoryFileSystem implements FileSystem {
     return version
   }
 
+  async watch(): Promise<null> {
+    // No page can be told that a file changed: the app asks instead.
+    return null
+  }
+
   async stat(baseId: string, path: string): Promise<FileVersion | null> {
     const found = path === '' ? this.loose.get(baseId) : this.files.get(path)
     return found?.version ?? null

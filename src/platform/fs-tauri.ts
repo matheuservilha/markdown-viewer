@@ -16,6 +16,7 @@ import {
   readFile,
   rename,
   stat,
+  watch,
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs'
@@ -196,6 +197,23 @@ export class TauriFileSystem implements FileSystem {
     const absolute = this.absolute(baseId, path)
     await writeFile(absolute, bytes)
     return this.version(absolute)
+  }
+
+  /**
+   * The desktop has a real watcher, so a file changed by something else, a
+   * script or another editor, is noticed while the window still has focus.
+   */
+  async watch(baseId: string, onChange: () => void): Promise<(() => void) | null> {
+    try {
+      const stop = await watch(this.absolute(baseId, ''), () => onChange(), {
+        recursive: true,
+        delayMs: 250,
+      })
+      return () => void stop()
+    } catch {
+      // A folder that cannot be watched still works; it is only checked later.
+      return null
+    }
   }
 
   async stat(baseId: string, path: string): Promise<FileVersion | null> {

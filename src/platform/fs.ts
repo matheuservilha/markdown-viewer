@@ -106,6 +106,12 @@ export interface FileSystem {
   /** What this platform can actually do, so the menu can hide the rest. */
   readonly can: Capabilities
   write(baseId: string, path: string, bytes: Uint8Array<ArrayBuffer>): Promise<FileVersion>
+  /**
+   * Calls back whenever anything under the base changes on disk. Returns the
+   * function that stops watching. Where the platform has no watcher it returns
+   * null, and the app falls back to asking.
+   */
+  watch(baseId: string, onChange: () => void): Promise<(() => void) | null>
   /** Current stamp, or null when the file is gone. */
   stat(baseId: string, path: string): Promise<FileVersion | null>
 }

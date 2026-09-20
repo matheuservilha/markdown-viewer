@@ -174,3 +174,10 @@ export const MoreIcon = (p: IconProps) => (
     <circle cx="18" cy="12" r="1.1" />
   </Icon>
 )
+
+export const ClockIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 1.8" />
+  </Icon>
+)

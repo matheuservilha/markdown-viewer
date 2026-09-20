@@ -459,38 +459,78 @@ a:focus-visible,
 .tree-scroll {
   flex: 1;
   min-height: 0;
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   padding-bottom: var(--space-2);
-  overflow: auto;
+
+  /* Only up and down. A sideways scroll here used to carry the buttons of the
+     header off the edge of the window. */
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .section-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   gap: 0.25rem;
   align-items: center;
 
   /* Not a fixed height: a long folder name used to wrap inside it and spill
      over the first rows of the tree. */
-  min-height: 1.5rem;
+  min-height: 1.75rem;
   padding-right: 0.125rem;
+  background: var(--bg-sidebar);
 }
 
 .section-head .section-label {
-  flex: 0 0 auto;
+  /* Shrinks instead of pushing the buttons off the edge. The whole name is in
+     the tooltip, and the sidebar can be dragged wider to read it. */
+  flex: 1 1 auto;
+  min-width: 0;
   margin-bottom: 0;
 }
 
-.section-spacer {
-  flex: 1;
-  min-width: 0.5rem;
+/* The header of a section that folds. */
+.section-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.25rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.section-link {
+  padding: 0 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-disabled);
+  font: inherit;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  transition: color var(--ease);
+}
+
+.section-link:hover {
+  color: var(--accent-text);
+}
+
+.tree-row.is-more {
+  color: var(--text-disabled);
+  font-size: 0.6875rem;
 }
 
 .section-actions {
   display: flex;
   flex: 0 0 auto;
   gap: 0.0625rem;
-  opacity: 0;
+  opacity: 0.55;
   transition: opacity var(--ease);
 }
 
@@ -500,8 +540,8 @@ a:focus-visible,
 }
 
 .icon-button.is-small {
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.625rem;
+  height: 1.625rem;
 }
 
 .section-label {
@@ -513,10 +553,8 @@ a:focus-visible,
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-
-  /* Shown whole and on one line. When it does not fit, the tree scrolls
-     sideways and the sidebar can be dragged wider. */
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .tree-section + .tree-section {

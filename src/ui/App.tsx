@@ -12,6 +12,7 @@ import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { MeasureGuides } from './MeasureGuides'
+import { Recents } from './Recents'
 import { SettingsWindow } from './SettingsWindow'
 import { SidebarResizer } from './SidebarResizer'
 import { canPrint, printHtml } from './print'
@@ -328,6 +329,26 @@ export function App() {
     return () => window.clearTimeout(timer)
   }, [activeDoc, saveActive])
 
+  /**
+   * Noticing what changed behind our back. Three ways, because no single one
+   * covers every platform: the desktop watcher, the moment the window comes
+   * back, and a slow poll for the browser, which has no watcher at all.
+   */
+  const POLL = 4000
+  const openBases = state.bases.map((base) => base.id).join(',')
+  useEffect(() => {
+    const check = () => void actions.checkExternalChanges()
+    // Read so the watchers are set up again whenever a folder is opened.
+    const stop = openBases === '' ? () => {} : actions.watchBases(check)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') check()
+    }, POLL)
+    return () => {
+      stop()
+      window.clearInterval(timer)
+    }
+  }, [actions, openBases])
+
   // Saving on blur, and looking for changes made behind our back on focus.
   useEffect(() => {
     const onBlur = () => saveActive()
@@ -431,13 +452,20 @@ export function App() {
         )}
 
         <nav className="tree-scroll" role="tree" aria-label="Arquivos">
+          <Recents
+            recents={state.recents}
+            openBases={state.bases.map((base) => base.id)}
+            onOpenFile={(file) => void actions.openRecentFile(file)}
+            onOpenBase={(base) => void actions.openRecentBase(base)}
+            onClear={actions.forgetRecents}
+          />
+
           {state.bases.map((base) => (
             <section className="tree-section" key={base.id}>
               <div className="section-head">
                 <h2 className="section-label" title={base.label}>
                   {base.name}
                 </h2>
-                <span className="section-spacer" />
                 <div className="section-actions">
                   <button
                     type="button"
@@ -446,7 +474,7 @@ export function App() {
                     title="Novo arquivo"
                     onClick={() => void createIn(base.id, '', 'file')}
                   >
-                    <FilePlusIcon size={15} />
+                    <FilePlusIcon size={17} />
                   </button>
                   <button
                     type="button"
@@ -455,7 +483,7 @@ export function App() {
                     title="Nova pasta"
                     onClick={() => void createIn(base.id, '', 'folder')}
                   >
-                    <FolderPlusIcon size={15} />
+                    <FolderPlusIcon size={17} />
                   </button>
                   <button
                     type="button"
@@ -464,7 +492,7 @@ export function App() {
                     title="Revelar o arquivo aberto"
                     onClick={() => void revealActive()}
                   >
-                    <CrosshairIcon size={15} />
+                    <CrosshairIcon size={17} />
                   </button>
                   <button
                     type="button"
@@ -473,7 +501,7 @@ export function App() {
                     title="Recolher tudo"
                     onClick={actions.collapseAll}
                   >
-                    <CollapseIcon size={15} />
+                    <CollapseIcon size={17} />
                   </button>
                 </div>
               </div>

@@ -40,5 +40,8 @@ export function fileSystem(): FileSystem {
           ? new TauriFileSystem()
           : new BrowserFileSystem()
   }
+  // A handle for driving the filesystem from the browser console during
+  // development, which is the only way to simulate a file changing underneath.
+  if (import.meta.env.DEV) (window as unknown as { fs?: FileSystem }).fs = chosen
   return chosen
 }

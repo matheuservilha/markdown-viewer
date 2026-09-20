@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { fileSystem } from '~/platform'
+import {
+  clearRecents,
+  loadRecents,
+  rememberBase,
+  rememberFile,
+  type RecentBase,
+  type RecentFile,
+  type Recents,
+} from './recents'
 import { byDepth, type Session, type SessionTab } from './session'
 import {
   baseName,
@@ -32,6 +41,8 @@ export interface Doc {
   dirty: boolean
   /** Set when the file changed on disk while we had unsaved edits. */
   conflict: boolean
+  /** Set when the file is no longer on disk. */
+  gone: boolean
 }
 
 export interface State {
@@ -44,6 +55,8 @@ export interface State {
   docs: Record<string, Doc>
   filter: string
   error: string | null
+  /** What has been opened before, folders and files. */
+  recents: Recents
   /** Bases from last session that the browser will only reopen after a click. */
   pending: string[]
   /** False until the attempt to reopen last session has finished. */
@@ -62,6 +75,7 @@ type Action =
   | { type: 'doc/edited'; id: string; text: string }
   | { type: 'doc/saved'; id: string; version: FileVersion }
   | { type: 'doc/conflicted'; id: string }
+  | { type: 'doc/vanished'; id: string }
   | { type: 'filter/set'; value: string }
   | { type: 'error/set'; message: string | null }
   | { type: 'session/restored'; pending: string[] }
@@ -69,6 +83,7 @@ type Action =
   | { type: 'entry/moved'; baseId: string; from: string; to: string }
   | { type: 'entry/removed'; baseId: string; path: string }
   | { type: 'folders/collapsed' }
+  | { type: 'recents/set'; recents: Recents }
 
 const initialState: State = {
   bases: [],
@@ -79,6 +94,7 @@ const initialState: State = {
   docs: {},
   filter: '',
   error: null,
+  recents: loadRecents(),
   pending: [],
   restored: false,
 }
@@ -170,6 +186,13 @@ function reducer(state: State, action: Action): State {
       return { ...state, docs: { ...state.docs, [action.id]: { ...doc, conflict: true } } }
     }
 
+    case 'doc/vanished': {
+      const doc = state.docs[action.id]
+      if (!doc || doc.gone) return state
+      // The text stays in the editor. Saving it puts the file back.
+      return { ...state, docs: { ...state.docs, [action.id]: { ...doc, gone: true, dirty: true } } }
+    }
+
     case 'filter/set':
       return { ...state, filter: action.value }
 
@@ -178,6 +201,9 @@ function reducer(state: State, action: Action): State {
 
     case 'session/restored':
       return { ...state, restored: true, pending: action.pending }
+
+    case 'recents/set':
+      return { ...state, recents: action.recents }
 
     case 'folders/collapsed':
       return { ...state, expanded: {} }
@@ -269,6 +295,7 @@ export function useWorkspace() {
     try {
       const base = await fileSystem().openBase()
       if (!base) return
+      dispatch({ type: 'recents/set', recents: rememberBase(base) })
       dispatch({ type: 'base/added', base })
       await loadChildren(base.id, '')
     } catch (error) {
@@ -307,9 +334,18 @@ export function useWorkspace() {
         },
       })
 
+      dispatch({
+        type: 'recents/set',
+        recents: rememberFile({
+          baseId: loose.baseId,
+          path: '',
+          name: loose.name,
+          label: loose.label,
+        }),
+      })
       if (latest.current.docs[id]) return
       const loaded = await fileSystem().read(loose.baseId, '')
-      dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false } })
+      dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false, gone: false } })
     } catch (error) {
       report(error)
     }
@@ -321,13 +357,17 @@ export function useWorkspace() {
         type: 'tab/opened',
         tab: { id: entry.id, baseId: entry.baseId, path: entry.path, name: entry.name, preview },
       })
+      dispatch({
+        type: 'recents/set',
+        recents: rememberFile({ baseId: entry.baseId, path: entry.path, name: entry.name }),
+      })
       if (latest.current.docs[entry.id]) return
       try {
         const loaded = await fileSystem().read(entry.baseId, entry.path)
         dispatch({
           type: 'doc/loaded',
           id: entry.id,
-          doc: { ...loaded, dirty: false, conflict: false },
+          doc: { ...loaded, dirty: false, conflict: false, gone: false },
         })
       } catch (error) {
         report(error)
@@ -371,7 +411,7 @@ export function useWorkspace() {
       if (!tab) return
       try {
         const loaded = await fileSystem().read(tab.baseId, tab.path)
-        dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false } })
+        dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false, gone: false } })
       } catch (error) {
         report(error)
       }
@@ -389,7 +429,7 @@ export function useWorkspace() {
       if (!doc) continue
       const onDisk = await fileSystem().stat(tab.baseId, tab.path)
       if (!onDisk) {
-        dispatch({ type: 'doc/conflicted', id: tab.id })
+        dispatch({ type: 'doc/vanished', id: tab.id })
         continue
       }
       if (onDisk.modifiedAt <= doc.version.modifiedAt) continue
@@ -488,7 +528,111 @@ export function useWorkspace() {
     [report],
   )
 
+  /**
+   * Opens something from the history. The folder it lives in may not be open
+   * any more, so it is reopened first. This always runs from a click, which is
+   * the only moment a browser will grant a folder's permission again.
+   */
+  const openRecentFile = useCallback(
+    async (file: RecentFile) => {
+      try {
+        const known = latest.current.bases.some((base) => base.id === file.baseId)
+        if (!known && file.path !== '') {
+          const result = await fileSystem().restoreBase(file.baseId, true)
+          if (result.status !== 'ok') {
+            report(new Error('A pasta desse arquivo não está mais acessível.'))
+            return
+          }
+          dispatch({ type: 'base/added', base: result.value })
+          await loadChildren(file.baseId, '')
+        }
+        if (!known && file.path === '') {
+          const result = await fileSystem().restoreFile(file.baseId, true)
+          if (result.status !== 'ok') {
+            report(new Error('Esse arquivo não está mais acessível.'))
+            return
+          }
+        }
+
+        const id = entryId(file.baseId, file.path)
+        dispatch({
+          type: 'tab/opened',
+          tab: {
+            id,
+            baseId: file.baseId,
+            path: file.path,
+            name: file.name,
+            preview: false,
+            ...(file.label === undefined ? {} : { label: file.label }),
+          },
+        })
+        dispatch({ type: 'recents/set', recents: rememberFile(file) })
+        if (latest.current.docs[id]) return
+        const loaded = await fileSystem().read(file.baseId, file.path)
+        dispatch({ type: 'doc/loaded', id, doc: { ...loaded, dirty: false, conflict: false, gone: false } })
+      } catch (error) {
+        report(error)
+      }
+    },
+    [loadChildren, report],
+  )
+
+  const openRecentBase = useCallback(
+    async (base: RecentBase) => {
+      try {
+        if (latest.current.bases.some((open) => open.id === base.id)) return
+        const result = await fileSystem().restoreBase(base.id, true)
+        if (result.status !== 'ok') {
+          report(new Error('Essa pasta não está mais acessível.'))
+          return
+        }
+        dispatch({ type: 'recents/set', recents: rememberBase(result.value) })
+        dispatch({ type: 'base/added', base: result.value })
+        await loadChildren(base.id, '')
+      } catch (error) {
+        report(error)
+      }
+    },
+    [loadChildren, report],
+  )
+
+  /**
+   * Watches every open folder, where the platform can. The desktop notices a
+   * file changed by another program while the window still has focus, which is
+   * the case the focus check never covered.
+   */
+  const watchBases = useCallback(
+    (onChange: () => void): (() => void) => {
+      const stops: (() => void)[] = []
+      let cancelled = false
+
+      for (const base of latest.current.bases) {
+        void fileSystem()
+          .watch(base.id, onChange)
+          .then((stop) => {
+            if (!stop) return
+            if (cancelled) stop()
+            else stops.push(stop)
+          })
+          .catch(() => {
+            // A folder that refuses to be watched is simply not watched.
+          })
+      }
+
+      return () => {
+        cancelled = true
+        for (const stop of stops) stop()
+      }
+    },
+    [],
+  )
+
   const collapseAll = useCallback(() => dispatch({ type: 'folders/collapsed' }), [])
+
+  const forgetRecents = useCallback(
+    () => dispatch({ type: 'recents/set', recents: clearRecents() }),
+    [],
+  )
 
   const expandFolder = useCallback(
     async (baseId: string, path: string) => {
@@ -551,7 +695,7 @@ export function useWorkspace() {
           dispatch({
             type: 'doc/loaded',
             id: tab.id,
-            doc: { ...loaded, dirty: false, conflict: false },
+            doc: { ...loaded, dirty: false, conflict: false, gone: false },
           })
         } catch {
           // A file that moved or was deleted simply does not come back.
@@ -571,6 +715,9 @@ export function useWorkspace() {
     () => ({
       openBase,
       openLooseFile,
+      openRecentFile,
+      openRecentBase,
+      forgetRecents,
       restoreSession,
       createEntry,
       renameEntry,
@@ -585,6 +732,7 @@ export function useWorkspace() {
       save,
       reload,
       checkExternalChanges,
+      watchBases,
       pinTab: (id: string) => dispatch({ type: 'tab/pinned', id }),
       closeTab: (id: string) => dispatch({ type: 'tab/closed', id }),
       activateTab: (id: string) => dispatch({ type: 'tab/activated', id }),
@@ -596,15 +744,19 @@ export function useWorkspace() {
       checkExternalChanges,
       collapseAll,
       createEntry,
+      forgetRecents,
       expandFolder,
       revealPath,
       duplicateEntry,
       renameEntry,
       revealEntry,
       trashEntry,
+      watchBases,
       openBase,
       openFile,
       openLooseFile,
+      openRecentBase,
+      openRecentFile,
       reload,
       restoreSession,
       save,

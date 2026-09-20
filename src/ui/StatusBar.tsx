@@ -49,7 +49,15 @@ export const StatusBar = memo(function StatusBar({ tab, doc, onReload, onSave }:
 
   return (
     <footer className="status">
-      {doc.conflict && (
+      {doc.gone && (
+        <span className="status-conflict">
+          <AlertIcon size={13} />O arquivo não está mais no disco.
+          <button type="button" onClick={onSave}>
+            Gravar de novo
+          </button>
+        </span>
+      )}
+      {!doc.gone && doc.conflict && (
         <span className="status-conflict">
           <AlertIcon size={13} />O arquivo mudou fora do editor.
           <button type="button" onClick={onSave}>

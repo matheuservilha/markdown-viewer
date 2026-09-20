@@ -314,6 +314,11 @@ export class BrowserFileSystem implements FileSystem {
     }
   }
 
+  async watch(): Promise<null> {
+    // No page can be told that a file changed: the app asks instead.
+    return null
+  }
+
   async stat(baseId: string, path: string): Promise<FileVersion | null> {
     try {
       const file = await (await this.fileAt(this.require(baseId), path)).getFile()
