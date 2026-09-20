@@ -385,6 +385,13 @@ export function App() {
     }
   }, [actions, openBases, state.index])
 
+  // The window says which file is open, and marks it when there is something
+  // unsaved in it.
+  useEffect(() => {
+    const name = activeTab?.name
+    document.title = name ? (activeDoc?.dirty ? '• ' + name : name) : 'markdown-viewer'
+  }, [activeTab?.name, activeDoc?.dirty])
+
   // Files handed over by the system, from a double click in the file manager
   // or from the command line.
   useEffect(() => {
