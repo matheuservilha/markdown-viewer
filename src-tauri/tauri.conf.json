@@ -39,6 +39,30 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdown",
+          "mkd",
+          "mdx"
+        ],
+        "name": "Markdown",
+        "description": "Documento Markdown",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "txt"
+        ],
+        "name": "Texto",
+        "description": "Documento de texto",
+        "mimeType": "text/plain",
+        "role": "Editor"
+      }
+    ]
   }
 }

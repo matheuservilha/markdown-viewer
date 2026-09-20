@@ -1661,3 +1661,82 @@ a:focus-visible,
   font-size: 0.72rem;
   white-space: nowrap;
 }
+
+/*
+ * A question the app asks before going on. It is modal because the answer
+ * decides what happens to text that exists nowhere else.
+ */
+.dialog-backdrop {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inset: 0;
+  padding: 1rem;
+  background: rgb(0 0 0 / 38%);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 22rem;
+  max-width: 100%;
+  padding: 1rem 1.125rem 0.875rem;
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 38%),
+    0 2px 8px rgb(0 0 0 / 22%);
+}
+
+.dialog-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.dialog-body {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.dialog-choices {
+  display: flex;
+  gap: 0.375rem;
+  justify-content: flex-end;
+  margin-top: 0.625rem;
+}
+
+.dialog-button {
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: var(--ease);
+  transition-property: background, border-color, color;
+}
+
+.dialog-button:hover {
+  border-color: var(--border-emphasis);
+  color: var(--text-primary);
+}
+
+.dialog-button.is-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-on);
+}
+
+.dialog-button.is-destructive {
+  color: var(--tone-red);
+}

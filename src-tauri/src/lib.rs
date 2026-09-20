@@ -1,4 +1,47 @@
+use std::sync::Mutex;
+use tauri::{Emitter, Manager};
 use tauri_plugin_fs::FsExt;
+
+/// Files the system asked this app to open, waiting for the window to be ready
+/// to take them.
+///
+/// A double click in the file manager can reach the app before the interface
+/// has finished loading, so the paths are held here until it comes asking.
+#[derive(Default)]
+struct Opened(Mutex<Vec<String>>);
+
+/// Hands over the paths waiting to be opened, and empties the queue.
+#[tauri::command]
+fn take_opened_paths(state: tauri::State<'_, Opened>) -> Vec<String> {
+    state
+        .0
+        .lock()
+        .map(|mut held| std::mem::take(&mut *held))
+        .unwrap_or_default()
+}
+
+/// Queues paths and tells the interface, which may or may not be listening yet.
+fn queue_opened(app: &tauri::AppHandle, paths: Vec<String>) {
+    if paths.is_empty() {
+        return;
+    }
+    if let Some(state) = app.try_state::<Opened>() {
+        if let Ok(mut held) = state.0.lock() {
+            held.extend(paths.iter().cloned());
+        }
+    }
+    let _ = app.emit("files-opened", paths);
+}
+
+/// The paths in the command line, which is how Windows and Linux pass a file
+/// that was double clicked. A flag, or a name that is not a file, is not one.
+fn paths_from_arguments() -> Vec<String> {
+    std::env::args()
+        .skip(1)
+        .filter(|argument| !argument.starts_with('-'))
+        .filter(|argument| std::path::Path::new(argument).is_file())
+        .collect()
+}
 
 /// Opens the scope of the filesystem plugin to a folder the person just picked
 /// in the system dialog. Nothing outside a folder they chose is reachable.
@@ -75,10 +118,17 @@ fn open_path(path: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![allow_base, move_to_trash, reveal_in_file_manager, open_path])
+        .manage(Opened::default())
+        .invoke_handler(tauri::generate_handler![
+            allow_base,
+            move_to_trash,
+            reveal_in_file_manager,
+            open_path,
+            take_opened_paths
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -87,8 +137,24 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            queue_opened(app.handle(), paths_from_arguments());
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    app.run(|_handle, _event| {
+        // macOS does not pass the file on the command line: it sends it to the
+        // running app, which is also how a second double click reaches the
+        // window that is already open.
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = _event {
+            let paths = urls
+                .iter()
+                .filter_map(|url| url.to_file_path().ok())
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect();
+            queue_opened(_handle, paths);
+        }
+    });
 }

@@ -2,16 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadSession, saveSession, type Session, type ViewState } from '~/app/session'
 import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
-import { entryId, parentPath, type Entry } from '~/platform/fs'
+import { baseName, entryId, parentPath, type Entry } from '~/platform/fs'
 import type { Heading } from '~/editor/outline'
 import { EditorView } from '@codemirror/view'
 import { exportDocument } from '~/editor/export-html'
 import { exportPdf } from '~/editor/export-pdf'
 import { fileSystem, platform } from '~/platform'
+import { onOpenedPaths } from '~/platform/opened'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { Dialog, type DialogChoice } from './Dialog'
 import { matchShortcut } from './shortcuts'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { InfoPanel } from './InfoPanel'
@@ -383,6 +385,24 @@ export function App() {
     }
   }, [actions, openBases, state.index])
 
+  // Files handed over by the system, from a double click in the file manager
+  // or from the command line.
+  useEffect(() => {
+    return onOpenedPaths((paths) => {
+      for (const path of paths) {
+        // A file opened from outside every folder is its own base, which is
+        // the same shape the history uses for a loose file.
+        void actions.openRecentFile({
+          baseId: path,
+          path: '',
+          name: baseName(path),
+          label: path,
+          at: Date.now(),
+        })
+      }
+    })
+  }, [actions])
+
   // Saving on blur, and looking for changes made behind our back on focus.
   useEffect(() => {
     const onBlur = () => {
@@ -404,18 +424,54 @@ export function App() {
    * there is, and closing the tab throws it away.
    */
   const closed = useRef<Tab[]>([])
+  const [question, setQuestion] = useState<{
+    title: string
+    body?: string
+    choices: DialogChoice[]
+  } | null>(null)
+
   const closeTab = useCallback(
     (id: string) => {
       const tab = latestState.current.tabs.find((candidate: Tab) => candidate.id === id)
-      const doc = latestState.current.docs[id]
-      if (tab && doc?.dirty) {
-        const go = window.confirm(
-          'Fechar "' + tab.name + '" sem salvar? O que foi escrito depois do último salvamento se perde.',
-        )
-        if (!go) return
+      const drop = () => {
+        if (tab) closed.current = [tab, ...closed.current].slice(0, 12)
+        actions.closeTab(id)
       }
-      if (tab) closed.current = [tab, ...closed.current].slice(0, 12)
-      actions.closeTab(id)
+      if (!tab || !latestState.current.docs[id]?.dirty) {
+        drop()
+        return
+      }
+      setQuestion({
+        title: 'Fechar ' + tab.name + '?',
+        body: 'Há alterações que ainda não foram salvas.',
+        choices: [
+          {
+            label: 'Cancelar',
+            onSelect: () => setQuestion(null),
+          },
+          {
+            label: 'Fechar sem salvar',
+            destructive: true,
+            onSelect: () => {
+              setQuestion(null)
+              drop()
+            },
+          },
+          {
+            label: 'Salvar e fechar',
+            primary: true,
+            onSelect: () => {
+              setQuestion(null)
+              void actions.save(id).then(() => {
+                // A save that did not take, because the file changed on disk
+                // or the folder went away, leaves the tab open: closing it now
+                // would throw away the text the save failed to write.
+                if (!latestState.current.docs[id]?.dirty) drop()
+              })
+            },
+          },
+        ],
+      })
     },
     [actions],
   )
@@ -851,6 +907,15 @@ export function App() {
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />
+      )}
+
+      {question && (
+        <Dialog
+          title={question.title}
+          body={question.body}
+          choices={question.choices}
+          onCancel={() => setQuestion(null)}
+        />
       )}
 
       {settingsOpen && (
