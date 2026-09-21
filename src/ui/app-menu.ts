@@ -12,27 +12,31 @@ import { SHORTCUTS, accelerator, type ShortcutId } from './shortcuts'
 
 /** What the editor does, as opposed to what the app around it does. */
 export type EditorCommandId =
-  | 'undo'
-  | 'redo'
-  | 'find'
-  | 'bold'
-  | 'italic'
-  | 'code'
-  | 'link'
-  | 'strike'
-  | 'highlight'
-  | 'task'
+  'undo' | 'redo' | 'find' | 'bold' | 'italic' | 'code' | 'link' | 'strike' | 'highlight' | 'task'
 
 export type CommandId =
-  | ShortcutId
-  | EditorCommandId
-  | { tab: number }
-  | { recentFile: number }
-  | { recentBase: number }
+  ShortcutId | EditorCommandId | { tab: number } | { recentFile: number } | { recentBase: number }
 
 export type MenuNode =
   | { kind: 'item'; label: string; command: CommandId; accelerator?: string; enabled?: boolean }
-  | { kind: 'native'; label: string; item: 'Cut' | 'Copy' | 'Paste' | 'SelectAll' | 'Minimize' | 'CloseWindow' | 'Quit' | 'Fullscreen' | 'Hide' | 'HideOthers' | 'ShowAll' | 'Services' | 'About' }
+  | {
+      kind: 'native'
+      label: string
+      item:
+        | 'Cut'
+        | 'Copy'
+        | 'Paste'
+        | 'SelectAll'
+        | 'Minimize'
+        | 'CloseWindow'
+        | 'Quit'
+        | 'Fullscreen'
+        | 'Hide'
+        | 'HideOthers'
+        | 'ShowAll'
+        | 'Services'
+        | 'About'
+    }
   | { kind: 'separator' }
   | { kind: 'submenu'; label: string; items: MenuNode[] }
 

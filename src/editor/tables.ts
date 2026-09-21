@@ -356,7 +356,10 @@ class TableWidget extends WidgetType {
     }
 
     const columnMenu = (column: number): MenuEntry[] => [
-      { label: 'Inserir coluna à esquerda', run: () => act((t) => insertColumn(t, column), { row: -1, column }) },
+      {
+        label: 'Inserir coluna à esquerda',
+        run: () => act((t) => insertColumn(t, column), { row: -1, column }),
+      },
       {
         label: 'Inserir coluna à direita',
         run: () => act((t) => insertColumn(t, column + 1), { row: -1, column: column + 1 }),
@@ -386,7 +389,10 @@ class TableWidget extends WidgetType {
     ]
 
     const rowMenu = (row: number): MenuEntry[] => [
-      { label: 'Inserir linha acima', run: () => act((t) => insertRow(t, row), { row, column: 0 }) },
+      {
+        label: 'Inserir linha acima',
+        run: () => act((t) => insertRow(t, row), { row, column: 0 }),
+      },
       {
         label: 'Inserir linha abaixo',
         run: () => act((t) => insertRow(t, row + 1), { row: row + 1, column: 0 }),
@@ -465,7 +471,6 @@ class TableWidget extends WidgetType {
     return true
   }
 }
-
 
 function draw(state: EditorState, tables: Span[]): DecorationSet {
   if (tables.length === 0) return Decoration.none

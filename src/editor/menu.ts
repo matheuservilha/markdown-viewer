@@ -62,8 +62,10 @@ export function openMenu(x: number, y: number, entries: MenuEntry[]): HTMLElemen
   // Measured and nudged back inside the window, so a menu opened near an edge
   // does not fall off it.
   const margin = 8
-  menu.style.left = Math.max(margin, Math.min(x, window.innerWidth - menu.offsetWidth - margin)) + 'px'
-  menu.style.top = Math.max(margin, Math.min(y, window.innerHeight - menu.offsetHeight - margin)) + 'px'
+  menu.style.left =
+    Math.max(margin, Math.min(x, window.innerWidth - menu.offsetWidth - margin)) + 'px'
+  menu.style.top =
+    Math.max(margin, Math.min(y, window.innerHeight - menu.offsetHeight - margin)) + 'px'
 
   function dismiss() {
     menu.remove()

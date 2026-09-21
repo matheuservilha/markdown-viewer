@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { SHORTCUTS, editorCap, keyCap, matchShortcut } from './shortcuts'
 
-const press = (key: string, held: Partial<Record<'meta' | 'ctrl' | 'shift' | 'alt', boolean>> = {}) => ({
+const press = (
+  key: string,
+  held: Partial<Record<'meta' | 'ctrl' | 'shift' | 'alt', boolean>> = {},
+) => ({
   key,
   metaKey: held.meta ?? false,
   ctrlKey: held.ctrl ?? false,
@@ -50,7 +53,9 @@ describe('reconhecer o atalho', () => {
 
 describe('escrever a tecla', () => {
   it('usa os símbolos do Mac', () => {
-    expect(keyCap({ id: 'openFile', label: '', key: 'o', mod: true, shift: true }, true)).toBe('⇧⌘O')
+    expect(keyCap({ id: 'openFile', label: '', key: 'o', mod: true, shift: true }, true)).toBe(
+      '⇧⌘O',
+    )
   })
 
   it('e o nome por extenso fora dele', () => {

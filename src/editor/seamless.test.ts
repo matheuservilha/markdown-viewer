@@ -32,7 +32,9 @@ function open(doc: string, cursor = 0): EditorView {
 
 /** What the lines of the editor actually show. */
 function shown(view: EditorView): string {
-  return [...view.contentDOM.querySelectorAll('.cm-line')].map((line) => line.textContent).join('\n')
+  return [...view.contentDOM.querySelectorAll('.cm-line')]
+    .map((line) => line.textContent)
+    .join('\n')
 }
 
 function withCursor(doc: string, cursor: number): string {

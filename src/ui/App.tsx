@@ -499,7 +499,10 @@ export function App() {
     const [tab, ...rest] = closed.current
     if (!tab) return
     closed.current = rest
-    void actions.openFile({ id: tab.id, baseId: tab.baseId, path: tab.path, name: tab.name } as Entry, false)
+    void actions.openFile(
+      { id: tab.id, baseId: tab.baseId, path: tab.path, name: tab.name } as Entry,
+      false,
+    )
   }, [actions])
 
   const stepTab = useCallback(
@@ -678,9 +681,10 @@ export function App() {
   const hasDocument = state.tabs.length > 0
   useEffect(() => {
     if (!isDesktop()) return
-    void installAppMenu(menuPlan({ recents: state.recents, hasDocument, apple: onApple() }), (
-      command,
-    ) => latestRun.current(command))
+    void installAppMenu(
+      menuPlan({ recents: state.recents, hasDocument, apple: onApple() }),
+      (command) => latestRun.current(command),
+    )
       // A menu that did not install leaves the app usable by keyboard, so it
       // is worth a line in the console and not an interruption.
       .catch((error: unknown) => console.error('menu do sistema:', error))

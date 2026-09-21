@@ -42,22 +42,14 @@
     },
     "fileAssociations": [
       {
-        "ext": [
-          "md",
-          "markdown",
-          "mdown",
-          "mkd",
-          "mdx"
-        ],
+        "ext": ["md", "markdown", "mdown", "mkd", "mdx"],
         "name": "Markdown",
         "description": "Documento Markdown",
         "mimeType": "text/markdown",
         "role": "Editor"
       },
       {
-        "ext": [
-          "txt"
-        ],
+        "ext": ["txt"],
         "name": "Texto",
         "description": "Documento de texto",
         "mimeType": "text/plain",

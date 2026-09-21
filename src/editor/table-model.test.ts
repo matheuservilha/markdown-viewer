@@ -95,7 +95,11 @@ describe('mudanças de estrutura', () => {
   })
 
   it('insere e remove linha', () => {
-    expect(insertRow(model, 1).rows).toEqual([['1', '2'], ['', ''], ['3', '4']])
+    expect(insertRow(model, 1).rows).toEqual([
+      ['1', '2'],
+      ['', ''],
+      ['3', '4'],
+    ])
     expect(removeRow(model, 0).rows).toEqual([['3', '4']])
   })
 

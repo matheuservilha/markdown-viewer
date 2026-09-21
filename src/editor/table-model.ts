@@ -81,7 +81,7 @@ export function serializeTable(model: TableModel): string {
 }
 
 export function insertColumn(model: TableModel, at: number): TableModel {
-  const put = <T,>(list: T[], value: T) => [...list.slice(0, at), value, ...list.slice(at)]
+  const put = <T>(list: T[], value: T) => [...list.slice(0, at), value, ...list.slice(at)]
   return {
     header: put(model.header, ''),
     align: put(model.align, 'left'),
@@ -92,7 +92,7 @@ export function insertColumn(model: TableModel, at: number): TableModel {
 export function removeColumn(model: TableModel, at: number): TableModel {
   // A table with no columns is not a table, so the last one never goes.
   if (model.header.length <= 1) return model
-  const drop = <T,>(list: T[]) => list.filter((_, index) => index !== at)
+  const drop = <T>(list: T[]) => list.filter((_, index) => index !== at)
   return {
     header: drop(model.header),
     align: drop(model.align),
@@ -112,7 +112,10 @@ export function removeRow(model: TableModel, at: number): TableModel {
 /** Row `-1` is the header. */
 export function setCell(model: TableModel, row: number, column: number, value: string): TableModel {
   if (row < 0) {
-    return { ...model, header: model.header.map((cell, index) => (index === column ? value : cell)) }
+    return {
+      ...model,
+      header: model.header.map((cell, index) => (index === column ? value : cell)),
+    }
   }
   return {
     ...model,

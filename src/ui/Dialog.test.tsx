@@ -33,7 +33,14 @@ const choices = (onSelect: () => void) => [
 
 describe('a caixa de pergunta', () => {
   it('mostra a pergunta e as três saídas', () => {
-    mount(<Dialog title="Fechar nota.md?" body="Há alterações." choices={choices(() => {})} onCancel={() => {}} />)
+    mount(
+      <Dialog
+        title="Fechar nota.md?"
+        body="Há alterações."
+        choices={choices(() => {})}
+        onCancel={() => {}}
+      />,
+    )
     expect(document.querySelector('.dialog-title')?.textContent).toBe('Fechar nota.md?')
     expect(buttons().map((b) => b.textContent)).toEqual([
       'Cancelar',
@@ -58,9 +65,9 @@ describe('a caixa de pergunta', () => {
     const onCancel = vi.fn()
     mount(<Dialog title="t" choices={choices(() => {})} onCancel={onCancel} />)
     act(() => {
-      document.querySelector('.dialog-backdrop')!.dispatchEvent(
-        new PointerEvent('pointerdown', { bubbles: true }),
-      )
+      document
+        .querySelector('.dialog-backdrop')!
+        .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
     expect(onCancel).toHaveBeenCalledOnce()
   })
@@ -69,7 +76,9 @@ describe('a caixa de pergunta', () => {
     const onCancel = vi.fn()
     mount(<Dialog title="t" choices={choices(() => {})} onCancel={onCancel} />)
     act(() => {
-      document.querySelector('.dialog')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      document
+        .querySelector('.dialog')!
+        .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
     expect(onCancel).not.toHaveBeenCalled()
   })
