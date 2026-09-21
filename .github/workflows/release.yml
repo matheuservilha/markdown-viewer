@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  bundle:
+    name: Empacota para ${{ matrix.label }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            label: macOS (Apple Silicon)
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            label: macOS (Intel)
+            args: '--target x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            label: Linux
+            args: ''
+          - platform: windows-latest
+            label: Windows
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The test files die loading jsdom on Node 20, and the deploy runs 22.
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # WebKitGTK and the AppImage packer only exist on the Linux runner.
+      - name: Instala as dependências de sistema do Linux
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: markdown-viewer __VERSION__
+          releaseBody: Baixe abaixo o pacote do seu sistema.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
