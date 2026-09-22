@@ -883,6 +883,40 @@ a:focus-visible,
   content: '';
 }
 
+/*
+ * A tab whose note is on the edge of the screen wears that note's colour.
+ *
+ * It is the underline and a short bar on the left, and nothing else: the
+ * colour says which note this is, and the strip still has to read as a strip
+ * of tabs rather than as a palette. The underline is already the mark of the
+ * tab in front, so a pinned one in front simply marks itself in its own
+ * colour instead of the app's.
+ */
+.tab.is-pinned {
+  padding-left: 1.125rem;
+}
+
+.tab.is-pinned::before {
+  position: absolute;
+  top: 50%;
+  left: 0.5rem;
+  width: 3px;
+  height: 0.875rem;
+  border-radius: 999px;
+  background: var(--pin);
+  content: '';
+  transform: translateY(-50%);
+  transition: height var(--ease);
+}
+
+.tab.is-pinned.is-active::before {
+  height: 1.125rem;
+}
+
+.tab.is-pinned.is-active::after {
+  background: var(--pin);
+}
+
 .tab.is-preview .tab-name {
   font-style: italic;
 }
@@ -1979,4 +2013,728 @@ a:focus-visible,
 
 .section-toggle:hover {
   color: var(--text-secondary);
+}
+
+/* ------------------------------------------------- notas fixadas */
+
+/*
+ * The squares on the edge of the screen, and the note that floats out of one.
+ *
+ * Both windows have no background of their own, so what is drawn here is all
+ * there is: between the squares, and around the card, the desktop shows
+ * through. The window is exactly as big as its contents, because a transparent
+ * window is still a window, and any part of it the person cannot see is a part
+ * of the screen that silently swallows their clicks.
+ */
+
+/* The six colours a note can carry, borrowed from the palette the callouts
+   already use, so they answer to the theme without a second set. */
+[data-color='ambar'] {
+  --pin: var(--tone-yellow);
+}
+[data-color='coral'] {
+  --pin: var(--tone-orange);
+}
+[data-color='malva'] {
+  --pin: var(--tone-purple);
+}
+[data-color='musgo'] {
+  --pin: var(--tone-green);
+}
+[data-color='oceano'] {
+  --pin: var(--tone-blue);
+}
+[data-color='ardosia'] {
+  --pin: var(--tone-teal);
+}
+
+html[data-window='dock'],
+html[data-window='dock'] body,
+html[data-window='peek'],
+html[data-window='peek'] body,
+html[data-window='note'],
+html[data-window='note'] body {
+  background: transparent;
+}
+
+/*
+ * The arrow everywhere but on a tab, where it is a hand.
+ *
+ * On Windows and Linux this is the whole of it. On macOS it is only half: the
+ * system decides a window's cursor from the cursor rectangles of the
+ * application that owns it, and consults those only for the application that
+ * is active, which this one is not and is not meant to be. There the cursor is
+ * set outright from the thread that watches the pointer, in `pointer.rs`.
+ */
+html[data-window='dock'],
+html[data-window='dock'] body {
+  cursor: default;
+  user-select: none;
+}
+
+html[data-window='dock'] .chip {
+  cursor: pointer;
+}
+
+/*
+ * The easing everything on the edge of the screen moves with: fast out of the
+ * gate and slightly past its mark before settling. A square that slides
+ * linearly to meet the pointer reads as a panel opening; one that overshoots a
+ * pixel and comes back reads as a thing.
+ */
+:root {
+  --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+/* ------------------------------------------------------------- as abinhas */
+
+/*
+ * Each tab is a rounded rectangle whose outer half is past the edge of the
+ * monitor. What shows is the inner half: rounded on the inside, cut square on
+ * the outside by the screen itself. They never come away from the edge, and
+ * the pointer arriving pulls more of one into view rather than sliding it
+ * inward, so the edge of the screen stays the edge of the tab.
+ */
+
+.dock {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.dock-column {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 0;
+}
+
+/* The button is the hit area, always the full width of the column, so the
+   pointer keeps hold of a tab that is still growing under it. */
+.chip {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+
+  /* Each tab comes in from behind the edge of the screen, one after the other,
+     so a column that just gained a note grows rather than blinks. */
+  animation: chip-in 280ms var(--spring) backwards;
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+.dock[data-side='left'] .chip {
+  animation-name: chip-in-left;
+}
+
+@keyframes chip-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
+/*
+ * The coloured face. It is a child and not the button so that it can grow
+ * while the hit area stays put: a tab that changed size and took its own hit
+ * area with it would shake under a pointer resting on its edge.
+ */
+.chip-face {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  background: linear-gradient(150deg, color-mix(in oklab, var(--pin) 86%, white), var(--pin));
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 26%),
+    0 6px 14px rgb(0 0 0 / 16%);
+  transition:
+    width 200ms var(--spring),
+    box-shadow 200ms var(--spring);
+
+  /*
+   * Every face carries the same border, and only the one that writes a new
+   * note colours it in. It is here and not there so that the box its contents
+   * are centred in is the same box in every tab: with the border on one face
+   * only, the sign inside that one sat three quarters of a pixel off from the
+   * dot inside the others, and on a five pixel dot that shows.
+   *
+   * The side that runs off the monitor gets none, because that side is not an
+   * edge anybody drew.
+   */
+  border: 1.5px solid transparent;
+}
+
+.dock[data-side='right'] .chip-face {
+  border-right: 0;
+}
+
+.dock[data-side='left'] .chip-face {
+  border-left: 0;
+}
+
+/* Round on the inside, square on the outside, because the outside is not an
+   edge anybody drew: it is where the monitor stops. */
+.dock[data-side='right'] .chip-face {
+  right: 0;
+  border-radius: 9px 0 0 9px;
+}
+
+.dock[data-side='left'] .chip-face {
+  left: 0;
+  border-radius: 0 9px 9px 0;
+}
+
+.chip.is-near .chip-face {
+  width: 30px;
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 30%),
+    0 12px 26px rgb(0 0 0 / 26%);
+}
+
+.chip:focus-visible {
+  outline: none;
+}
+
+.chip:focus-visible .chip-face {
+  width: 30px;
+  box-shadow:
+    0 0 0 2px var(--bg-app),
+    0 0 0 4px var(--pin);
+}
+
+/*
+ * A note with something unwritten in it wears a dot. It sits in the middle of
+ * the face rather than at a fixed distance from the edge of the window, so it
+ * travels with the tab as the tab grows instead of standing still while the
+ * colour slides out from under it.
+ */
+.chip:focus-visible {
+  outline: none;
+}
+
+.chip:focus-visible .chip-face {
+  width: 30px;
+  box-shadow:
+    0 0 0 2px var(--bg-app),
+    0 0 0 4px var(--pin);
+}
+
+/*
+ * A note with something unwritten in it wears a dot. It sits in the middle of
+ * the face rather than at a fixed distance from the edge of the window, so it
+ * travels with the tab as the tab grows instead of standing still while the
+ * colour slides out from under it.
+ */
+/*
+ * A note with something unwritten in it is a full round on the inside.
+ *
+ * Not a mark, and not a size. Sixteen pixels of colour is not a surface you
+ * put a symbol on, and every ink tried there had the same problem: the six
+ * colours are pale on a dark background and deep on a light one, so what reads
+ * on one theme disappears on the other. Sticking out further was worse still,
+ * because a tab that is permanently half open looks broken rather than full.
+ *
+ * The silhouette has none of that. The tab keeps its place, its size and its
+ * colour, and only its shape says something: square-cornered inside is settled,
+ * fully round is not. A pill and a rounded rectangle are told apart at a glance
+ * on any background and in any theme, because the difference is the outline and
+ * not the ink.
+ */
+.chip.is-dirty .chip-face {
+  border-radius: 15px 0 0 15px;
+}
+
+.dock[data-side='left'] .chip.is-dirty .chip-face {
+  border-radius: 0 15px 15px 0;
+}
+
+/* ---- the tab that writes a new note */
+
+/*
+ * It wears the colour the next note will be born with, so the tab says what it
+ * is about to make. Hollow until the pointer arrives, so a column of five
+ * notes plus this one still reads as five notes.
+ *
+ * The outline is a real border and not a ring, so the side that runs off the
+ * monitor can be left undrawn. A ring would draw a line down the edge of the
+ * screen and give the tab an outside it is not supposed to have.
+ */
+/* It only colours in the border every face already carries. */
+.chip.is-new .chip-face {
+  border-color: color-mix(in oklab, var(--pin) 50%, transparent);
+  background: color-mix(in oklab, var(--pin) 20%, transparent);
+  box-shadow: none;
+}
+
+.chip.is-new.is-near .chip-face {
+  border-color: transparent;
+  background: linear-gradient(150deg, color-mix(in oklab, var(--pin) 86%, white), var(--pin));
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 30%),
+    0 12px 26px rgb(0 0 0 / 26%);
+}
+
+/* Centred in the face like the dot, and for the same reason: it belongs to the
+   tab, not to the window the tab is drawn in. */
+.chip-plus {
+  flex: 0 0 auto;
+  color: var(--pin);
+  transition:
+    color 200ms var(--spring),
+    transform 320ms var(--spring);
+}
+
+.chip.is-new.is-near .chip-plus {
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+/* ------------------------------------------------------- a nota que flutua */
+
+.peek {
+  display: flex;
+  height: 100%;
+  padding: 0;
+}
+
+.peek.is-blank {
+  display: none;
+}
+
+/*
+ * The card is the window's only child and carries everything the window used
+ * to: the corners, the edge and the shadow. It comes in from the side its tab
+ * is on, so it reads as coming out of that tab.
+ *
+ * It is slightly see-through, because a note that floats over the work it is
+ * about should let a little of that work show. The blur behind it is what
+ * keeps the text readable over something busy: without it, a paragraph over a
+ * photograph is a paragraph nobody reads. It is a small window over a mostly
+ * still desktop, which is the one case where the cost of blurring is worth
+ * paying.
+ */
+.peek-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 14px;
+  background: color-mix(
+    in srgb,
+    var(--bg-content) calc(clamp(0, var(--note-opacity, 1) + var(--note-lift, 0), 1) * 100%),
+    transparent
+  );
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 22%),
+    0 18px 44px rgb(0 0 0 / 34%);
+  animation: peek-in 170ms var(--spring) backwards;
+  backdrop-filter: blur(var(--note-blur, 14px)) saturate(1.3);
+  transition:
+    background-color 260ms ease,
+    backdrop-filter 260ms ease,
+    border-color 260ms ease;
+
+  /* The reading column is the window: there is no room here for the width the
+     app's editor uses, and centring inside 392px is not a column anyway. */
+  --measure: 100%;
+}
+
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.985);
+  }
+}
+
+.peek-head {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.4375rem;
+  align-items: center;
+  height: 2.125rem;
+  padding: 0 0.3125rem 0 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-2) calc(var(--note-opacity, 1) * 100%), transparent);
+}
+
+/*
+ * The kept note has no title bar of its own, so its header is one: the whole
+ * strip drags the window, apart from the buttons at the end of it.
+ */
+.peek.is-kept .peek-head {
+  height: 2.375rem;
+  padding-left: 0.5rem;
+  cursor: default;
+}
+
+/* Two short rules that say "this is the part you hold", which is the one thing
+   a window with no title bar has no other way of saying. */
+.peek-grip {
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.875rem;
+  border-right: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
+  opacity: 0.55;
+}
+
+.peek.is-kept .peek-card {
+  animation-name: keep-in;
+}
+
+/* A note that was clicked comes forward rather than sliding in from the side:
+   it was already on screen as a glance, and this is the same note stepping
+   out of the column. */
+@keyframes keep-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/*
+ * A note being written in closes up; one sitting there lets more through.
+ *
+ * It is a quarter of a second either way, and not a switch, because it happens
+ * every time the keyboard goes somewhere else. Snapping between two looks on
+ * every click elsewhere is a card that keeps catching the eye of somebody who
+ * was reading something else.
+ */
+.peek.is-kept .peek-card[data-writing='true'] {
+  --note-lift: 0.07;
+  --note-blur: 22px;
+
+  border-color: color-mix(in oklab, var(--pin) 34%, var(--border-emphasis));
+}
+
+/*
+ * In the glance it is a quiet bar, because there is nothing to press there.
+ * In the kept note it is a dot you click to change the colour, so it is round
+ * and it answers to the pointer.
+ */
+.peek-colour {
+  flex: 0 0 auto;
+  width: 0.25rem;
+  height: 1.0625rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pin, var(--text-disabled));
+}
+
+.peek.is-kept .peek-colour {
+  width: 0.6875rem;
+  height: 0.6875rem;
+  cursor: pointer;
+  transition:
+    transform var(--ease),
+    box-shadow var(--ease);
+}
+
+.peek.is-kept .peek-colour:hover,
+.peek.is-kept .peek-colour[aria-expanded='true'] {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--pin) 28%, transparent);
+}
+
+/* The six, in a small card under the dot they came out of. */
+.peek-colours {
+  position: absolute;
+  top: 2.125rem;
+  left: 0.75rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.4375rem;
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 24%),
+    0 10px 24px rgb(0 0 0 / 28%);
+  animation: colours-in 140ms var(--spring) backwards;
+}
+
+@keyframes colours-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+.peek-swatch {
+  width: 1.125rem;
+  height: 1.125rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pin);
+  cursor: pointer;
+  opacity: 0.78;
+  transition:
+    opacity var(--ease),
+    transform var(--ease),
+    box-shadow var(--ease);
+}
+
+.peek-swatch:hover {
+  opacity: 1;
+  transform: scale(1.12);
+}
+
+.peek-swatch[aria-pressed='true'] {
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px var(--surface-2),
+    0 0 0 3.5px var(--pin);
+}
+
+/* The whole card, so that anywhere at all puts the colours away. */
+.peek-dismiss {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.peek-title {
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 560;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.peek-badge {
+  flex: 0 0 auto;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+}
+
+/* What the square underneath the pointer does if it is clicked. It is a label
+   and not a button: the click lands on the square, not here. */
+.peek-open {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
+  align-items: center;
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.peek-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The app's editor breathes because it has a screen to breathe in. Here it
+   does not, so the padding comes down to what a card can spare. */
+.peek .cm-content {
+  padding: 0.625rem 0 1.5rem;
+}
+
+.peek .cm-line {
+  padding: 0 0.875rem;
+}
+
+/*
+ * Nothing in a glance is meant to be typed in, so it has no caret.
+ *
+ * The kept note shares this class and is the opposite: it is a note somebody
+ * clicked in order to write in it, and a text field with no caret is a text
+ * field that looks broken. Hence the exception, spelled out rather than
+ * relying on the editor to hide its own caret when it is not editable.
+ */
+.peek:not(.is-kept) .cm-cursor,
+.peek:not(.is-kept) .cm-dropCursor {
+  display: none !important;
+}
+
+/* And the pointer says so on the way in: a beam over the text of a note you
+   can write in, the ordinary arrow over one you cannot. */
+.peek.is-kept .cm-content {
+  cursor: text;
+}
+
+.peek-gone {
+  margin: 0;
+  padding: 1rem;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+/* A note in the settings window: prose, not a control. */
+.settings-note {
+  margin: 0.25rem 0 0;
+  padding: 0 0.125rem;
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+/* Somebody who asked their system for less movement gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip-face,
+  .chip-plus,
+  .peek-card {
+    animation: none;
+    transition: none;
+  }
+
+  /* With nothing moving, a tab has to be at its full width to be findable. */
+  .chip-face {
+    width: 30px;
+  }
+}
+
+/* ------------------------------------------------ prévia da opacidade */
+
+/*
+ * A card of the right shape over a background busy enough to show what is
+ * getting through. The note itself does change while the slider moves, but
+ * only when a note happens to be open, and choosing a number you cannot see
+ * is choosing at random.
+ */
+.opacity-preview {
+  display: flex;
+  align-items: center;
+  height: 3.25rem;
+  margin: 0.125rem 0 0.25rem;
+  padding: 0 0.625rem;
+  border-radius: var(--radius-sm);
+  background-image: linear-gradient(
+    135deg,
+    var(--tone-purple) 0%,
+    var(--tone-blue) 45%,
+    var(--tone-teal) 100%
+  );
+}
+
+.opacity-preview-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+  justify-content: center;
+  height: 2.375rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-sm);
+  background: var(--bg-content);
+}
+
+.opacity-preview-bar {
+  width: 2.75rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.opacity-preview-line {
+  width: 100%;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+  opacity: 0.55;
+}
+
+.opacity-preview-line.is-short {
+  width: 62%;
+}
+
+/* ------------------------------------------------ perguntar antes de fechar */
+
+/*
+ * Closing from the tab's own menu, out on the edge of the screen, asks first.
+ * Whoever pressed it is looking at thirty pixels of colour and not at the
+ * note: they cannot see what they are about to lose.
+ */
+.peek-ask {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--bg-content) 92%, transparent);
+  backdrop-filter: blur(8px);
+  animation: peek-in 140ms var(--spring) backwards;
+}
+
+.peek-ask-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 560;
+  font-size: 0.8125rem;
+}
+
+.peek-ask-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  justify-content: center;
+}
+
+.peek-ask-row button {
+  height: 1.875rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background-color var(--ease),
+    color var(--ease);
+}
+
+.peek-ask-row button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.peek-ask-row button.is-quiet:hover {
+  color: var(--tone-red);
+}
+
+.peek-ask-row button.is-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-on);
+}
+
+.peek-ask-row button.is-primary:hover {
+  background: var(--accent-hover);
+  color: var(--accent-on);
 }

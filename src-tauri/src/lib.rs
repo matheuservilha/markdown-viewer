@@ -1,5 +1,10 @@
+mod chipmenu;
+mod panels;
+mod pointer;
+mod tray;
+
 use std::sync::Mutex;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, WindowEvent};
 use tauri_plugin_fs::FsExt;
 
 /// Files the system asked this app to open, waiting for the window to be ready
@@ -116,6 +121,26 @@ fn open_path(path: String) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+/// Closing the app's own window puts it away instead of ending the app.
+///
+/// The notes on the edge of the screen are the point: they are supposed to
+/// still be there after the editor is out of the way, the same way a sticky
+/// note on a monitor does not depend on the drawer being open. The tray is
+/// what brings the window back, and the tray is also the only thing that
+/// really quits, along with the system's own Quit.
+fn hide_instead_of_closing(app: &tauri::AppHandle) {
+    let Some(window) = app.get_webview_window(panels::MAIN) else {
+        return;
+    };
+    let hidden = window.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = hidden.hide();
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -123,12 +148,25 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .manage(Opened::default())
+        .manage(panels::Scale::default())
+        .manage(pointer::Watch::default())
+        .on_menu_event(|app, event| chipmenu::on_chosen(app, event.id().as_ref()))
         .invoke_handler(tauri::generate_handler![
             allow_base,
             move_to_trash,
             reveal_in_file_manager,
             open_path,
-            take_opened_paths
+            take_opened_paths,
+            panels::work_area,
+            panels::panel_place,
+            panels::panel_prepare,
+            panels::cursor_at,
+            pointer::watch_chips,
+            chipmenu::chip_menu,
+            panels::panel_hide,
+            panels::panel_is_open,
+            panels::show_main,
+            panels::quit_app
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -143,6 +181,8 @@ pub fn run() {
             #[cfg(desktop)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
+            tray::install(app.handle())?;
+            hide_instead_of_closing(app.handle());
             queue_opened(app.handle(), paths_from_arguments());
             Ok(())
         })
@@ -154,13 +194,20 @@ pub fn run() {
         // running app, which is also how a second double click reaches the
         // window that is already open.
         #[cfg(any(target_os = "macos", target_os = "ios"))]
-        if let tauri::RunEvent::Opened { urls } = _event {
+        if let tauri::RunEvent::Opened { ref urls } = _event {
             let paths = urls
                 .iter()
                 .filter_map(|url| url.to_file_path().ok())
                 .map(|path| path.to_string_lossy().into_owned())
                 .collect();
             queue_opened(_handle, paths);
+        }
+
+        // Clicking the icon in the Dock on a Mac, which is where somebody who
+        // put the window away with the red button goes looking for it first.
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { .. } = _event {
+            let _ = panels::show_main(_handle.clone());
         }
     });
 }

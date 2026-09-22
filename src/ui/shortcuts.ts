@@ -16,6 +16,8 @@ export type ShortcutId =
   | 'previousTab'
   | 'toggleSidebar'
   | 'toggleInfo'
+  | 'togglePin'
+  | 'toggleDock'
   | 'settings'
   | 'print'
   | 'zoomIn'
@@ -46,6 +48,8 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'previousTab', label: 'Aba anterior', key: '[', mod: true, shift: true },
   { id: 'toggleSidebar', label: 'Barra lateral', key: '\\', mod: true },
   { id: 'toggleInfo', label: 'Painel de sumário', key: '\\', mod: true, shift: true },
+  { id: 'togglePin', label: 'Fixar na barra de notas', key: 'p', mod: true, shift: true },
+  { id: 'toggleDock', label: 'Barra de notas fixadas', key: 'd', mod: true, shift: true },
   { id: 'settings', label: 'Ajustes', key: ',', mod: true },
   { id: 'print', label: 'Imprimir', key: 'p', mod: true },
   { id: 'zoomIn', label: 'Aumentar a interface', key: '=', mod: true },

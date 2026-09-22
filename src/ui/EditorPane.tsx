@@ -27,6 +27,12 @@ interface Props {
   onOutline: (headings: Heading[]) => void
   /** Hands the live editor out, so the panel can scroll it. */
   onReady: (view: EditorView | null) => void
+  /**
+   * Whether the cursor lands here as soon as the editor is built. True in the
+   * app, where opening a file is a request to write in it. False in the note
+   * that floats out on hover, which nobody asked to type in yet.
+   */
+  autoFocus?: boolean
 }
 
 export function EditorPane({
@@ -39,6 +45,7 @@ export function EditorPane({
   onSave,
   onOutline,
   onReady,
+  autoFocus = true,
 }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
@@ -63,7 +70,11 @@ export function EditorPane({
       EditorView.updateListener.of((update) => {
         if (update.docChanged) handlers.current.onChange(update.state.doc.toString())
         if (update.docChanged || update.selectionSet) report()
-        if (update.docChanged) publishOutline()
+        // Every update and not only the ones that changed the text: parsing
+        // happens in the background, so a document whose end was still being
+        // read when the summary was taken is finished a beat later, and the
+        // summary has to catch up with it.
+        publishOutline()
       }),
     ]
 
@@ -84,7 +95,7 @@ export function EditorPane({
       parent,
     })
     view.current = instance
-    instance.focus()
+    if (autoFocus) instance.focus()
 
     // A handle for measuring in the browser console during development.
     if (import.meta.env.DEV) (window as unknown as { cm?: EditorView }).cm = instance
@@ -100,9 +111,17 @@ export function EditorPane({
       })
     }
 
-    // The tree is parsed in the background, so the first reading comes a beat
-    // after the editor opens, and again whenever the text changes.
-    let headings: Heading[] = []
+    /*
+     * The tree is parsed in the background, so the first reading comes a beat
+     * after the editor opens, and again whenever the text changes.
+     *
+     * `null` and not an empty list, because those are different things: one
+     * means nothing has been said yet, the other means this document has no
+     * headings. Starting at the empty list made a document with no headings
+     * look like a document that had already been reported, and the panel went
+     * on showing the headings of the file before it.
+     */
+    let headings: Heading[] | null = null
     let outlineTimer = 0
     function publishOutline(): void {
       window.clearTimeout(outlineTimer)
@@ -110,7 +129,7 @@ export function EditorPane({
         const current = view.current
         if (!current) return
         const next = outlineOf(current.state)
-        if (sameOutline(next, headings)) return
+        if (headings !== null && sameOutline(next, headings)) return
         headings = next
         handlers.current.onOutline(next)
       }, 250)

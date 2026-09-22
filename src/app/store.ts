@@ -79,6 +79,7 @@ type Action =
   | { type: 'folder/toggled'; id: string }
   | { type: 'tab/opened'; tab: Tab }
   | { type: 'tab/pinned'; id: string }
+  | { type: 'tab/renamed'; id: string; name: string }
   | { type: 'tab/closed'; id: string }
   | { type: 'tab/activated'; id: string }
   | { type: 'doc/loaded'; id: string; doc: Doc }
@@ -147,6 +148,20 @@ function reducer(state: State, action: Action): State {
         ...state,
         tabs: state.tabs.map((tab) => (tab.id === action.id ? { ...tab, preview: false } : tab)),
       }
+
+    /**
+     * Only a draft is renamed this way, and only by its own first line. A file
+     * is renamed on disk, by `entry/moved`, because its name is the name of
+     * something that exists.
+     */
+    case 'tab/renamed': {
+      const tab = state.tabs.find((candidate) => candidate.id === action.id)
+      if (!tab || tab.name === action.name || !isDraft(tab)) return state
+      return {
+        ...state,
+        tabs: state.tabs.map((one) => (one.id === action.id ? { ...one, name: action.name } : one)),
+      }
+    }
 
     case 'tab/closed': {
       const index = state.tabs.findIndex((tab) => tab.id === action.id)
@@ -879,6 +894,7 @@ export function useWorkspace() {
       checkExternalChanges,
       watchBases,
       pinTab: (id: string) => dispatch({ type: 'tab/pinned', id }),
+      renameTab: (id: string, name: string) => dispatch({ type: 'tab/renamed', id, name }),
       closeTab: (id: string) => dispatch({ type: 'tab/closed', id }),
       activateTab: (id: string) => dispatch({ type: 'tab/activated', id }),
       edit: (id: string, text: string) => dispatch({ type: 'doc/edited', id, text }),

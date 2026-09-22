@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { EDITOR_BINDINGS, SHORTCUTS, editorCap, keyCap, onApple } from './shortcuts'
 import { FONT_LABELS, LIMITS, type BodyFont, type Settings, type ThemeMode } from '~/app/settings'
+import type { Side } from '~/app/dock-layout'
 import { ChevronIcon, CloseIcon, GripIcon } from './icons'
 
 const POSITION_KEY = 'markdown-viewer.settings.position'
@@ -179,6 +180,53 @@ export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocu
           ]}
           onChange={(value) => update('themeMode', value)}
         />
+
+        <div className="settings-divider" />
+        <p className="section-label">Notas fixadas</p>
+
+        <button
+          type="button"
+          className="settings-row is-clickable"
+          aria-pressed={settings.dock}
+          onClick={() => update('dock', !settings.dock)}
+        >
+          <span className="settings-label">Quadradinhos na borda</span>
+          <span className="switch" data-on={settings.dock} />
+        </button>
+
+        <Segmented
+          label="Lado"
+          value={settings.dockSide}
+          options={[
+            { value: 'left' as Side, label: 'Esquerda' },
+            { value: 'right' as Side, label: 'Direita' },
+          ]}
+          onChange={(value) => update('dockSide', value)}
+        />
+
+        <Slider
+          label="Opacidade"
+          value={settings.noteOpacity}
+          limits={LIMITS.noteOpacity}
+          format={(value) => Math.round(value * 100) + '%'}
+          onChange={(value) => update('noteOpacity', value)}
+        />
+
+        {/* The note itself changes while the slider moves, but it is only open
+            when it is open. This is the same card over the same kind of busy
+            background, here to be looked at while the number is chosen. */}
+        <div className="opacity-preview" aria-hidden="true">
+          <div className="opacity-preview-card" style={{ opacity: settings.noteOpacity }}>
+            <span className="opacity-preview-bar" />
+            <span className="opacity-preview-line" />
+            <span className="opacity-preview-line is-short" />
+          </div>
+        </div>
+
+        <p className="settings-note">
+          Os quadradinhos ficam por cima dos outros apps. Fechar a janela do app deixa eles lá, e o
+          ícone ao lado do relógio traz o app de volta ou encerra tudo.
+        </p>
 
         <div className="settings-divider" />
         <p className="section-label">Árvore</p>

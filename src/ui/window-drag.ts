@@ -31,7 +31,14 @@ export function isDragRegion(target: Element | null): boolean {
   return target.closest(INTERACTIVE) === null
 }
 
-export async function installWindowDrag(): Promise<() => void> {
+/**
+ * `maximize` is off for the floating note. Double clicking its header there is
+ * somebody missing the close button, not somebody asking for a note the size
+ * of the screen.
+ */
+export async function installWindowDrag({ maximize = true }: { maximize?: boolean } = {}): Promise<
+  () => void
+> {
   if (!isDesktop()) return () => {}
 
   let appWindow: AppWindow
@@ -56,7 +63,7 @@ export async function installWindowDrag(): Promise<() => void> {
   }
 
   window.addEventListener('mousedown', onMouseDown)
-  window.addEventListener('dblclick', onDoubleClick)
+  if (maximize) window.addEventListener('dblclick', onDoubleClick)
   return () => {
     window.removeEventListener('mousedown', onMouseDown)
     window.removeEventListener('dblclick', onDoubleClick)

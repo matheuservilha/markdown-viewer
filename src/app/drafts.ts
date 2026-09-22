@@ -44,6 +44,25 @@ export function nextDraftName(taken: readonly string[]): string {
   return base + ' ' + n
 }
 
+/**
+ * The name a note written on the edge of the screen gives itself.
+ *
+ * Nobody names a sticky note before writing it, so the name is taken from the
+ * first line that has anything on it, with the heading marks and the list
+ * bullet taken off. An empty note keeps the name it was born with.
+ */
+export function noteTitle(text: string, fallback: string): string {
+  for (const line of text.split('\n')) {
+    const stripped = line
+      .replace(/^\s*#{1,6}\s+/, '')
+      .replace(/^\s*[-*+]\s+(\[[ xX]\]\s+)?/, '')
+      .replace(/^\s*>\s?/, '')
+      .trim()
+    if (stripped !== '') return stripped.slice(0, 60)
+  }
+  return fallback
+}
+
 export function loadDrafts(): Draft[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)

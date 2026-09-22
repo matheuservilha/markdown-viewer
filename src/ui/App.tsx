@@ -6,7 +6,18 @@ import {
   type SessionTab,
   type ViewState,
 } from '~/app/session'
-import { isDraft, loadDrafts, saveDrafts } from '~/app/drafts'
+import {
+  DRAFT_BASE,
+  isDraft,
+  loadDrafts,
+  nextDraftName,
+  noteTitle,
+  saveDrafts,
+  type Draft,
+} from '~/app/drafts'
+import { isDraftPin, isPinned, type Pin, type PinTarget } from '~/app/pinned'
+import { useDock } from './useDock'
+import { onTrayNewNote } from '~/platform/tray'
 import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, nativeBaseName, parentPath, type Entry } from '~/platform/fs'
@@ -31,7 +42,7 @@ import { supportsDirectoryPicker } from '~/platform/fs-browser'
 import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { Dialog, type DialogChoice } from './Dialog'
-import { matchShortcut, onApple } from './shortcuts'
+import { SHORTCUTS, keyCap, matchShortcut, onApple } from './shortcuts'
 import { installAppMenu, menuPlan, type CommandId } from './app-menu'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { InfoPanel } from './InfoPanel'
@@ -55,10 +66,12 @@ import {
   FolderPlusIcon,
   MoreIcon,
   PanelRightIcon,
+  PinIcon,
   SearchIcon,
   SettingsIcon,
   SidebarIcon,
   ThemeIcon,
+  UnpinIcon,
 } from './icons'
 import { useResolvedTheme } from './useTheme'
 
@@ -96,6 +109,14 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [headings, setHeadings] = useState<Heading[]>([])
   const editor = useRef<EditorView | null>(null)
+  /**
+   * The pinned list and the way to change it, read from the file tree's menu.
+   * That menu is built above the dock host and would drag half the file with
+   * it if it were moved below, so it reaches both through a reference.
+   */
+  const latestPins = useRef<Pin[]>([])
+  const togglePinRef = useRef<(target: PinTarget) => void>(() => {})
+  const unpinRef = useRef<(id: string) => void>(() => {})
 
   // Only the four slices the tree reads, so that typing in a document does not
   // invalidate it.
@@ -156,6 +177,23 @@ export function App() {
           disabled: entry.kind === 'directory',
           onSelect: () => void actions.duplicateEntry(entry),
         },
+        ...(entry.kind === 'file'
+          ? [
+              {
+                label: isPinned(latestPins.current, entry.id)
+                  ? 'Desafixar da barra de notas'
+                  : 'Fixar na barra de notas',
+                separated: true,
+                onSelect: () =>
+                  togglePinRef.current({
+                    id: entry.id,
+                    baseId: entry.baseId,
+                    path: entry.path,
+                    name: entry.name,
+                  }),
+              },
+            ]
+          : []),
         {
           label: 'Copiar caminho',
           separated: true,
@@ -297,6 +335,99 @@ export function App() {
     // oxlint-disable-next-line immutability
     latestState.current = state
   })
+
+  /** The address of a note, the shape both the pin list and the dock use. */
+  const pinTargetOf = useCallback(
+    (tab: Tab): PinTarget => ({
+      id: tab.id,
+      baseId: tab.baseId,
+      path: tab.path,
+      name: tab.name,
+      ...(tab.label === undefined ? {} : { label: tab.label }),
+    }),
+    [],
+  )
+
+  const dock = useDock({
+    enabled: settings.dock,
+    side: settings.dockSide,
+    theme,
+    opacity: settings.noteOpacity,
+    readOnly: settings.readOnly,
+
+    draftText: useCallback((pinId: string) => latestState.current.docs[pinId]?.text, []),
+
+    onDraftText: useCallback(
+      (pinId: string, next: string) => {
+        actions.edit(pinId, next)
+        // The tab, the note and the square on the edge of the screen show the
+        // same draft, so they answer to the same name: its own first line.
+        const tab = latestState.current.tabs.find((one: Tab) => one.id === pinId)
+        if (tab) actions.renameTab(pinId, noteTitle(next, tab.name))
+      },
+      [actions],
+    ),
+
+    /**
+     * The square at the foot of the column writes an ordinary draft, in an
+     * ordinary tab.
+     *
+     * It is the same note in both places: unsaved in the tab strip and a
+     * square on the edge of the screen. Closing the tab throws the text away,
+     * so the square goes with it.
+     */
+    onNewNote: useCallback((): PinTarget | null => {
+      const taken = latestState.current.tabs.map((tab: Tab) => tab.name)
+      const draft: Draft = {
+        id: String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8),
+        name: nextDraftName(taken),
+        text: '',
+        at: Date.now(),
+      }
+      const id = actions.newNote(draft)
+      return { id, baseId: DRAFT_BASE, path: draft.id, name: draft.name }
+    }, [actions]),
+
+    onOpenInApp: useCallback(
+      (pin: Pin) => {
+        // A draft is already a tab; it only has to come to the front.
+        if (isDraftPin(pin)) {
+          actions.activateTab(pin.id)
+          return
+        }
+        void actions.openRecentFile({
+          baseId: pin.baseId,
+          path: pin.path,
+          name: pin.name,
+          ...(pin.label === undefined ? {} : { label: pin.label }),
+          at: Date.now(),
+        })
+      },
+      [actions],
+    ),
+  })
+
+  const { pins } = dock
+  const pinnedActive = activeTab !== null && isPinned(pins, activeTab.id)
+
+  useEffect(() => {
+    // oxlint-disable-next-line immutability
+    latestPins.current = pins
+    // oxlint-disable-next-line immutability
+    togglePinRef.current = dock.togglePin
+    // oxlint-disable-next-line immutability
+    unpinRef.current = dock.unpin
+  })
+
+  const togglePinActive = useCallback(() => {
+    const tab = latestTab.current
+    if (!tab) return
+    dock.togglePin(pinTargetOf(tab))
+  }, [dock, pinTargetOf])
+
+  // A note asked for from the tray, which may have been the only thing on
+  // screen for days.
+  useEffect(() => onTrayNewNote(() => actions.newNote()), [actions])
 
   // Dragging the window by its own interface, on the desktop.
   useEffect(() => {
@@ -500,6 +631,11 @@ export function App() {
       const tab = latestState.current.tabs.find((candidate: Tab) => candidate.id === id)
       const drop = () => {
         if (tab) closed.current = [tab, ...closed.current].slice(0, 12)
+        // A draft only exists in its tab. Closing it throws the text away, and
+        // a row on the edge of the screen pointing at nothing is worse than no
+        // row at all, so the pin goes with it. A file outlives its tab, and
+        // stays pinned.
+        if (tab && isDraft(tab)) unpinRef.current(id)
         actions.closeTab(id)
       }
       if (!tab || !latestState.current.docs[id]?.dirty) {
@@ -666,6 +802,12 @@ export function App() {
           case 'toggleInfo':
             update('infoPanel', !settings.infoPanel)
             break
+          case 'togglePin':
+            togglePinActive()
+            break
+          case 'toggleDock':
+            update('dock', !settings.dock)
+            break
           case 'settings':
             setSettingsOpen((open) => !open)
             break
@@ -688,7 +830,19 @@ export function App() {
         }
       })
     },
-    [actions, closeTab, documentMenu, once, reopenTab, settings.infoPanel, stepTab, update, zoom],
+    [
+      actions,
+      closeTab,
+      documentMenu,
+      once,
+      reopenTab,
+      settings.dock,
+      settings.infoPanel,
+      stepTab,
+      togglePinActive,
+      update,
+      zoom,
+    ],
   )
 
   useEffect(() => {
@@ -915,6 +1069,7 @@ export function App() {
             )}
             <Tabs
               state={state}
+              pins={pins}
               onActivate={actions.activateTab}
               onPin={actions.pinTab}
               onClose={closeTab}
@@ -931,6 +1086,25 @@ export function App() {
                 <span className="save-dot" />
                 {activeDoc.dirty ? 'Não salvo' : 'Salvo'}
               </span>
+            )}
+            {activeDoc && (
+              <button
+                type="button"
+                className={'icon-button' + (pinnedActive ? ' is-on' : '')}
+                aria-label={
+                  pinnedActive ? 'Desafixar da barra de notas' : 'Fixar na barra de notas'
+                }
+                title={
+                  (pinnedActive ? 'Desafixar da barra de notas' : 'Fixar na barra de notas') +
+                  ' (' +
+                  keyCap(SHORTCUTS.find((one) => one.id === 'togglePin')!) +
+                  ')'
+                }
+                aria-pressed={pinnedActive}
+                onClick={togglePinActive}
+              >
+                {pinnedActive ? <UnpinIcon size={16} /> : <PinIcon size={16} />}
+              </button>
             )}
             {activeDoc && (
               <button
@@ -974,7 +1148,17 @@ export function App() {
                   views.current = { ...views.current, [activeTab.id]: view }
                   persist()
                 }}
-                onChange={(text) => actions.edit(activeTab.id, text)}
+                onChange={(text) => {
+                  actions.edit(activeTab.id, text)
+                  // A draft has no file to take its name from, so it takes it
+                  // from its own first line, in the tab strip and on its
+                  // square at the same time.
+                  if (isDraft(activeTab)) {
+                    const named = noteTitle(text, activeTab.name)
+                    actions.renameTab(activeTab.id, named)
+                    dock.renamePin(activeTab.id, named)
+                  }
+                }}
                 onSave={saveActive}
                 onOutline={setHeadings}
                 onReady={(view) => {

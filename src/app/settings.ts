@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import type { Side } from './dock-layout'
 
 export type BodyFont = 'sans' | 'serif' | 'mono'
 export type ThemeMode = 'system' | 'light' | 'dark'
@@ -35,6 +36,18 @@ export interface Settings {
   readOnly: boolean
   /** Whether a pause in the typing writes the file by itself. */
   autosave: boolean
+  /** Whether the pinned notes sit on the edge of the screen. */
+  dock: boolean
+  /** Which edge they sit on. */
+  dockSide: Side
+  /**
+   * How solid a note that floats over everything else is, from 0 to 1.
+   *
+   * A note pinned open sits on top of the work it is about. Letting a little
+   * of that work through is what stops it reading as a hole punched in the
+   * screen; letting too much through is what stops it being readable.
+   */
+  noteOpacity: number
 }
 
 export const DEFAULTS: Settings = {
@@ -54,6 +67,14 @@ export const DEFAULTS: Settings = {
   // somebody's back is the kind of help that is only welcome when it was asked
   // for.
   autosave: false,
+  // On, but empty: with nothing pinned there is one square on the edge, the
+  // one that writes a note, and it is the only thing that shows the feature
+  // exists.
+  dock: true,
+  // The right, because that is where the scrollbar already is and where the
+  // text is not.
+  dockSide: 'right',
+  noteOpacity: 0.94,
 }
 
 export const LIMITS = {
@@ -63,6 +84,10 @@ export const LIMITS = {
   uiScale: { min: 0.9, max: 1.35, step: 0.05 },
   sidebarWidth: { min: 170, max: 620, step: 1 },
   infoWidth: { min: 180, max: 520, step: 1 },
+  // Never fully see-through: a note you can read the desktop through is not a
+  // note, and below about three quarters the text starts fighting whatever is
+  // behind it.
+  noteOpacity: { min: 0.72, max: 1, step: 0.01 },
 } as const
 
 const FONT_STACKS: Record<BodyFont, string> = {
@@ -79,7 +104,16 @@ export const FONT_LABELS: Record<BodyFont, string> = {
 
 const STORAGE_KEY = 'markdown-viewer.settings'
 
-function load(): Settings {
+/**
+ * The settings as they are on disk.
+ *
+ * Exported because the two panels need to paint themselves with the same
+ * numbers as the app without joining in the writing of them: they read, they
+ * apply, and they never store. Storage is shared between the windows, so a
+ * panel that wrote back a copy it read a minute ago would quietly undo a
+ * setting somebody had just changed in the app.
+ */
+export function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (!stored) return DEFAULTS
@@ -91,7 +125,7 @@ function load(): Settings {
   }
 }
 
-function apply(settings: Settings): void {
+export function applySettings(settings: Settings): void {
   const root = document.documentElement.style
   root.setProperty('--measure', settings.measurePx + 'px')
   root.setProperty('--ui-scale', String(settings.uiScale))
@@ -101,13 +135,14 @@ function apply(settings: Settings): void {
   root.setProperty('--line-height', String(settings.lineHeight))
   root.setProperty('--font-body', FONT_STACKS[settings.bodyFont])
   root.setProperty('--font-heading', FONT_STACKS[settings.bodyFont])
+  root.setProperty('--note-opacity', String(settings.noteOpacity))
 }
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings>(load)
+  const [settings, setSettings] = useState<Settings>(loadSettings)
 
   useEffect(() => {
-    apply(settings)
+    applySettings(settings)
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     } catch {

@@ -124,6 +124,7 @@ export function menuPlan({ recents, hasDocument, apple }: MenuInput): MenuNode[]
         },
         { kind: 'separator' },
         item('Salvar', 'save', hasDocument),
+        item('Fixar na barra de notas', 'togglePin', hasDocument),
         item('Imprimir', 'print', hasDocument),
         { kind: 'separator' },
         item('Fechar aba', 'closeTab', hasDocument),
@@ -173,6 +174,7 @@ export function menuPlan({ recents, hasDocument, apple }: MenuInput): MenuNode[]
       items: [
         item('Barra lateral', 'toggleSidebar'),
         item('Painel de sumário', 'toggleInfo'),
+        item('Barra de notas fixadas', 'toggleDock'),
         { kind: 'separator' },
         item('Aumentar a interface', 'zoomIn'),
         item('Diminuir a interface', 'zoomOut'),
