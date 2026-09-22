@@ -55,6 +55,15 @@
         "mimeType": "text/plain",
         "role": "Editor"
       }
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/matheuservilha/markdown-viewer/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0NDVBQUNBMDhCRDkwQzUKUldURmtMMEl5cXBGTkZQc0pqZXl3Y3V0ZkY5VXlabUVMb01GQUlGMlJNQnBsQkdWZFM4cFRxaHUK"
+    }
   }
 }
