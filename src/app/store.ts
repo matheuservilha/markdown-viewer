@@ -10,7 +10,7 @@ import {
   type RecentFile,
   type Recents,
 } from './recents'
-import { byDepth, type Session, type SessionTab } from './session'
+import { byDepth, restoreMayChooseActive, type Session, type SessionTab } from './session'
 import {
   baseName,
   entryId,
@@ -724,10 +724,12 @@ export function useWorkspace() {
         await loadChildren(baseId, path)
       }
 
+      const restoredIds: string[] = []
       for (const tab of session.tabs) {
         if (!available.has(tab.baseId)) continue
         try {
           const loaded = await fileSystem().read(tab.baseId, tab.path)
+          restoredIds.push(tab.id)
           dispatch({ type: 'tab/opened', tab: toTab(tab) })
           dispatch({
             type: 'doc/loaded',
@@ -739,7 +741,11 @@ export function useWorkspace() {
         }
       }
 
-      if (session.activeId && latest.current.docs[session.activeId]) {
+      if (
+        session.activeId &&
+        latest.current.docs[session.activeId] &&
+        restoreMayChooseActive(latest.current.activeId, restoredIds)
+      ) {
         dispatch({ type: 'tab/activated', id: session.activeId })
       }
 

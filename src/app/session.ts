@@ -58,3 +58,25 @@ export function saveSession(session: Session): void {
 export function byDepth(entryIds: string[]): string[] {
   return entryIds.toSorted((a, b) => a.split('/').length - b.split('/').length)
 }
+
+/**
+ * Whether restoring the session may still choose which tab is in front.
+ *
+ * Restoring is slow: every file is read from disk before the session can say
+ * which of them was in front last time. A file handed over by the system, from
+ * a double click in the file manager, arrives in the middle of that and opens
+ * a tab of its own. Whoever finishes last would otherwise win, and it is the
+ * restore that finishes last, so the file the person just asked for loses to
+ * the one they had open yesterday.
+ *
+ * So the restore only decides while every tab on screen is one it opened.
+ * A tab it does not recognise means somebody else chose, and that choice is
+ * the newer one.
+ */
+export function restoreMayChooseActive(
+  currentActiveId: string | null,
+  restoredIds: readonly string[],
+): boolean {
+  if (currentActiveId === null) return true
+  return restoredIds.includes(currentActiveId)
+}
