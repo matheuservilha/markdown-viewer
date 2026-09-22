@@ -223,8 +223,12 @@ fn build(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
     // appear and go on their own and are never sized by hand.
     let kept = label == NOTE;
 
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
-        .title(if label == DOCK { "Notas fixadas" } else { "Nota" })
+    let window = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        .title(if label == DOCK {
+            "Notas fixadas"
+        } else {
+            "Nota"
+        })
         // No title bar, because a panel the width of a scrollbar has nowhere
         // to put one. The interface draws what little furniture it needs.
         .decorations(false)
@@ -253,7 +257,16 @@ fn build(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
         .focused(false)
         .inner_size(320.0, 420.0)
         .build()
-        .map_err(stringify)
+        .map_err(stringify)?;
+
+    // Outside the Mac a menu bar lives inside the window, and a menu set for
+    // the whole app lands in every window it opens. A panel has no room for
+    // one: in the column of tabs it was a grey strip behind the tabs, and it
+    // covered the transparency that lets the desktop show between them.
+    #[cfg(not(target_os = "macos"))]
+    window.remove_menu().map_err(stringify)?;
+
+    Ok(window)
 }
 
 fn stringify(error: tauri::Error) -> String {

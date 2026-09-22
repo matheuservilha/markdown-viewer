@@ -8,7 +8,7 @@
  */
 
 import type { Recents } from '~/app/recents'
-import { SHORTCUTS, accelerator, type ShortcutId } from './shortcuts'
+import { SHORTCUTS, accelerator, onApple, type ShortcutId } from './shortcuts'
 
 /** What the editor does, as opposed to what the app around it does. */
 export type EditorCommandId =
@@ -251,5 +251,15 @@ export async function installAppMenu(
   }
 
   const menu = await Menu.new({ items: (await build(plan)) as never })
-  await menu.setAsAppMenu()
+  // On a Mac the menu belongs to the application and lives in the bar at the
+  // top of the screen. Elsewhere an application menu is a menu bar inside
+  // every window it has, and the column of tabs on the edge of the screen,
+  // thirty pixels wide, showed one squeezed behind its tabs. There it is
+  // given to the app's own window and to nothing else.
+  if (onApple()) {
+    await menu.setAsAppMenu()
+    return
+  }
+  const { getCurrentWindow } = await import('@tauri-apps/api/window')
+  await menu.setAsWindowMenu(getCurrentWindow())
 }
