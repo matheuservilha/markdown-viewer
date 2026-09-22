@@ -3,6 +3,7 @@ import { loadSession, saveSession, type Session, type ViewState } from '~/app/se
 import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, nativeBaseName, parentPath, type Entry } from '~/platform/fs'
+import { noteHome } from '~/app/new-note'
 import type { Heading } from '~/editor/outline'
 import { EditorView, type Command } from '@codemirror/view'
 import { redo, undo } from '@codemirror/commands'
@@ -43,6 +44,7 @@ import {
   BrandMark,
   CollapseIcon,
   CrosshairIcon,
+  FileIcon,
   FilePlusIcon,
   FolderPlusIcon,
   MoreIcon,
@@ -110,6 +112,27 @@ export function App() {
     },
     [actions],
   )
+
+  /**
+   * A new note, wherever it can go. Inside the folder the person is working
+   * in, and when no folder is open at all, wherever the system dialog says.
+   */
+  const newNote = useCallback(async () => {
+    const home = noteHome(state.bases, state.tabs, state.activeId)
+    if (home) {
+      await createIn(home.baseId, home.parent, 'file')
+      return
+    }
+    const target = await fileSystem().saveAs('Sem título.md', new Uint8Array())
+    if (!target) return
+    await actions.openRecentFile({
+      baseId: target,
+      path: '',
+      name: nativeBaseName(target),
+      label: target,
+      at: Date.now(),
+    })
+  }, [actions, createIn, state.activeId, state.bases, state.tabs])
 
   const menuItems = useCallback(
     (entry: Entry): MenuItem[] => {
@@ -546,7 +569,7 @@ export function App() {
 
   const runCommand = useCallback(
     (hit: CommandId) => {
-      const { activeId, tabs, bases, recents } = latestState.current
+      const { activeId, tabs, recents } = latestState.current
       const view = editor.current
 
       if (typeof hit === 'object') {
@@ -593,13 +616,9 @@ export function App() {
             // Saving works wherever the focus is, including inside a table.
             if (activeId) void actions.save(activeId)
             break
-          case 'newFile': {
-            const base = tabs.find((tab: Tab) => tab.id === activeId)?.baseId ?? bases[0]?.id
-            if (!base) return
-            const parent = parentPath(tabs.find((tab: Tab) => tab.id === activeId)?.path ?? '')
-            void createIn(base, parent, 'file')
+          case 'newFile':
+            void newNote()
             break
-          }
           case 'openBase':
             void actions.openBase()
             break
@@ -649,7 +668,7 @@ export function App() {
     [
       actions,
       closeTab,
-      createIn,
+      newNote,
       documentMenu,
       once,
       reopenTab,
@@ -737,12 +756,16 @@ export function App() {
         </div>
 
         <div className="nav-actions">
+          <button type="button" className="nav-action" onClick={() => void newNote()}>
+            <FilePlusIcon />
+            Nova nota
+          </button>
           <button type="button" className="nav-action" onClick={() => void actions.openBase()}>
             <FolderPlusIcon />
             Abrir pasta
           </button>
           <button type="button" className="nav-action" onClick={() => void actions.openLooseFile()}>
-            <FilePlusIcon />
+            <FileIcon />
             Abrir arquivo
           </button>
         </div>
@@ -848,6 +871,8 @@ export function App() {
             onToggle={() => update('recentsOpen', !settings.recentsOpen)}
             onOpenFile={(file) => void actions.openRecentFile(file)}
             onOpenBase={(base) => void actions.openRecentBase(base)}
+            onForgetFile={(file) => actions.forgetRecentFile(file.baseId, file.path)}
+            onForgetBase={(base) => actions.forgetRecentBase(base.id)}
             onClear={actions.forgetRecents}
           />
         </div>
@@ -944,6 +969,17 @@ export function App() {
                   editor.current = view
                 }}
               />
+              {settings.infoPanel && (
+                <SidebarResizer
+                  width={settings.infoWidth}
+                  onCommit={(next) => update('infoWidth', next)}
+                  variable="--info-width"
+                  limits={LIMITS.infoWidth}
+                  invert
+                  label="Largura do painel de sumário e links"
+                  restore={DEFAULTS.infoWidth}
+                />
+              )}
               {settings.infoPanel && (
                 <InfoPanel
                   tab={activeTab}
