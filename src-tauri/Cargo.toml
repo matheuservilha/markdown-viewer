@@ -1,6 +1,6 @@
 [package]
 name = "markdown-viewer"
-version = "0.2.2"
+version = "0.2.3"
 description = "Editor de Markdown sobre uma pasta de arquivos"
 authors = ["Reasset"]
 license = ""
