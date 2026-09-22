@@ -37,12 +37,6 @@ tauri-plugin-dialog = "2"
 trash = "5"
 tauri-plugin-process = "2"
 
-# Setting the pointer to a hand from a window that is not the active one is
-# the one thing the cross-platform layer cannot do on a Mac: it goes through
-# cursor rectangles, and the system only consults those for the active app.
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2-app-kit = { version = "0.3", features = ["NSCursor"] }
-
 # The updater does not build for mobile, and this app has no mobile target.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

@@ -72,6 +72,8 @@ export interface Messages {
   'note:closed': null
   /** Taken off the edge of the screen from inside the note itself. */
   'note:unpin': { id: string }
+  /** A colour chosen from inside the note itself. */
+  'note:recolour': { id: string; color: PinColor }
   /** A draft edited in the kept note; the app's window stores it. */
   'note:draft': { id: string; text: string }
   /** Something unwritten in the kept note, so its tab can show a dot. */

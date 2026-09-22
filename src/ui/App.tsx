@@ -1082,6 +1082,7 @@ export function App() {
             )}
             <Tabs
               state={state}
+              pins={pins}
               onActivate={actions.activateTab}
               onPin={actions.pinTab}
               onClose={closeTab}

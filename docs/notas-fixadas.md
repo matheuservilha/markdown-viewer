@@ -66,11 +66,24 @@ Então quem vigia é uma linha de execução do lado do Rust, em
 janela principal recebe esse aviso, acende a abinha e abre a nota. As abinhas
 não adivinham nada: elas são informadas.
 
-A mãozinha do cursor vem do mesmo lugar, e pelo mesmo motivo. O jeito normal,
-que é a janela dizer qual cursor ela quer, passa pelas áreas de cursor do app
-dono da janela, e o sistema só consulta as do app ativo. No Windows e no Linux
-o CSS resolve; no macOS o cursor é trocado direto, na mesma linha de execução
-que vigia o ponteiro.
+### O cursor de mãozinha não funciona no macOS em segundo plano
+
+No Windows e no Linux o CSS resolve. No macOS, não, e a causa é estrutural: o
+cursor no macOS pertence ao **aplicativo ativo**. Um app que não está ativo não
+manda na forma do ponteiro, por nenhum caminho. Foram tentados três:
+
+1. `cursor: pointer` no CSS. Funciona só enquanto o app está ativo.
+2. `set_cursor_icon` do Tauri. Passa pelas áreas de cursor, que o sistema só
+   consulta para o app ativo.
+3. `NSCursor.set()` direto, na linha principal. `NSCursor` é por aplicação, e
+   a de um app inativo é ignorada. Pior: chamar `arrowCursor` em laço, para
+   restaurar a seta ao sair da abinha, pisava no cursor de todas as outras
+   janelas do app. Isso saiu.
+
+A saída de verdade seria a coluna ser um `NSPanel` não-ativante, que pode
+receber o ponteiro sem o app vir para a frente. Só dá para pedir isso trocando
+a classe da janela em tempo de execução, e a tentativa derrubou o app. Foi
+revertida. Fica como assunto em aberto, com o aviso de que o custo é esse.
 
 ## Fechar o app não fecha as notas
 

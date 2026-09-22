@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { applySettings, loadSettings } from '~/app/settings'
-import { isDraftPin, pinTitle } from '~/app/pinned'
+import { PIN_COLORS, isDraftPin, pinTitle, type PinColor } from '~/app/pinned'
 import type { Doc, Tab } from '~/app/store'
 import { fileSystem } from '~/platform'
 import { encode, type TextShape } from '~/platform/text'
@@ -45,6 +45,10 @@ export function Note() {
   const [dirty, setDirty] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [reloads, setReloads] = useState(0)
+  /** Whether the six colours are showing under the dot in the header. */
+  const [picking, setPicking] = useState(false)
+  /** Whether this window has the keyboard, which is what "being written in" is. */
+  const [writing, setWriting] = useState(false)
 
   useEffect(() => {
     const stops = [
@@ -62,6 +66,25 @@ export function Note() {
     send('panel:hello', { role: 'note' })
     return () => {
       for (const stop of stops) stop()
+    }
+  }, [])
+
+  /**
+   * A note being written in closes up; one sitting there lets more through.
+   *
+   * It is the same note either way, so it changes over a fifth of a second
+   * rather than at once: a card that snaps between two looks every time the
+   * pointer goes elsewhere is a card that keeps catching the eye.
+   */
+  useEffect(() => {
+    const took = () => setWriting(true)
+    const gave = () => setWriting(false)
+    window.addEventListener('focus', took)
+    window.addEventListener('blur', gave)
+    setWriting(document.hasFocus())
+    return () => {
+      window.removeEventListener('focus', took)
+      window.removeEventListener('blur', gave)
     }
   }, [])
 
@@ -234,11 +257,14 @@ export function Note() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close()
+      if (event.key !== 'Escape') return
+      // The colours are the nearer thing to dismiss, so they go first.
+      if (picking) setPicking(false)
+      else close()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [close])
+  }, [close, picking])
 
   if (!note || !pin) return <div className="peek is-blank" />
 
@@ -246,12 +272,19 @@ export function Note() {
 
   return (
     <div className="peek is-kept" data-color={pin.color}>
-      <div className="peek-card">
+      <div className="peek-card" data-writing={writing}>
         {/* The header is the title bar: there is no other, and this is what
             the window is dragged by. */}
         <header className="peek-head" data-drag-window>
           <span className="peek-grip" aria-hidden="true" />
-          <span className="peek-colour" />
+          <button
+            type="button"
+            className="peek-colour"
+            aria-label="Cor da nota"
+            title="Cor da nota"
+            aria-expanded={picking}
+            onClick={() => setPicking((open) => !open)}
+          />
           <span className="peek-title" title={pin.label ?? pin.path}>
             {pinTitle(pin)}
           </span>
@@ -298,6 +331,36 @@ export function Note() {
             <CloseIcon size={13} />
           </button>
         </header>
+
+        {picking && (
+          <>
+            {/* Anywhere else puts the colours away, including the text: it is
+                a window the size of a card and there is nowhere to click that
+                is not something. */}
+            <button
+              type="button"
+              className="peek-dismiss"
+              aria-label="Fechar as cores"
+              onClick={() => setPicking(false)}
+            />
+            <div className="peek-colours" role="group" aria-label="Cor da nota">
+              {PIN_COLORS.map((color: PinColor) => (
+                <button
+                  key={color}
+                  type="button"
+                  className="peek-swatch"
+                  data-color={color}
+                  aria-label={color}
+                  aria-pressed={color === pin.color}
+                  onClick={() => {
+                    send('note:recolour', { id: pin.id, color })
+                    setPicking(false)
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         {conflict && (
           <div className="peek-warn" role="alert">

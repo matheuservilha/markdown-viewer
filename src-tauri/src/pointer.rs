@@ -71,9 +71,7 @@ pub fn watch_chips(app: tauri::AppHandle, rects: Vec<ChipRect>) {
         let mut last: i64 = -1;
         loop {
             if generation.load(Ordering::SeqCst) != mine {
-                // Somebody else is watching now. Leave the cursor as we found
-                // it, in case we were the ones holding it as a hand.
-                ask_for_hand(&app, false);
+                // Somebody else is watching now.
                 return;
             }
 
@@ -91,41 +89,8 @@ pub fn watch_chips(app: tauri::AppHandle, rects: Vec<ChipRect>) {
                 last = over;
                 let _ = app.emit(CHIP_EVENT, over);
             }
-            // Set on every pass and not only on the change: the system puts
-            // the cursor back to an arrow whenever the pointer moves, and a
-            // pointer resting on a tab is still moving a pixel at a time.
-            ask_for_hand(&app, over >= 0);
 
             std::thread::sleep(EVERY);
         }
     });
 }
-
-/// Makes the pointer a hand while it is over a tab.
-///
-/// The ordinary way, which is to tell the window what cursor it wants, works
-/// through the cursor rectangles of the application that owns the window, and
-/// the system only consults those for the application that is active. This one
-/// is not, and is not going to be. Setting the cursor outright is the only way
-/// a window that is merely on top gets to say what the pointer looks like.
-///
-/// It has to happen on the main thread. The watching does not, and must not:
-/// it sleeps between readings, and the main thread is where everything the
-/// person can see is drawn. So the reading happens here and the cursor is
-/// handed over to be set there.
-#[cfg(target_os = "macos")]
-fn ask_for_hand(app: &tauri::AppHandle, hand: bool) {
-    let _ = app.run_on_main_thread(move || {
-        use objc2_app_kit::NSCursor;
-
-        if hand {
-            NSCursor::pointingHandCursor().set();
-        } else {
-            NSCursor::arrowCursor().set();
-        }
-    });
-}
-
-/// Everywhere else the window's own cursor works, and the stylesheet sets it.
-#[cfg(not(target_os = "macos"))]
-fn ask_for_hand(_app: &tauri::AppHandle, _hand: bool) {}

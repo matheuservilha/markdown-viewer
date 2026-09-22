@@ -27,6 +27,7 @@ import {
   isDraftPin,
   isPinned,
   loadPins,
+  recolourPin,
   removePin,
   renamePin,
   savePins,
@@ -322,6 +323,14 @@ export function useDock(options: DockOptions) {
       on('note:closed', () => setKept(null)),
 
       on('note:unpin', ({ id }) => forgetRef.current(id)),
+
+      on('note:recolour', ({ id, color }) => {
+        setPins((current) => recolourPin(current, id, color))
+        // The note is told its new colour without being reloaded: it is the
+        // same note, and the text in it is the same text.
+        const pin = findPin(latest.current.pins, id)
+        if (pin) send('note:show', describe({ ...pin, color }))
+      }),
 
       on('note:dirty', ({ id, dirty }) => {
         setKeptDirty((current) =>
