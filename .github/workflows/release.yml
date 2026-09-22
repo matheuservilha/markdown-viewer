@@ -6,8 +6,29 @@ on:
       - 'v*'
 
 jobs:
+  # The updater compares the version in `tauri.conf.json` against the one the
+  # running app was built with. A tag that disagrees with the config produces a
+  # release nobody is ever offered, and nothing anywhere reports an error, so
+  # the disagreement is caught here instead of in the wild.
+  check-version:
+    name: Confere se a tag bate com a versão
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compara a tag com o tauri.conf.json
+        run: |
+          set -euo pipefail
+          config=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$config" != "$tag" ]; then
+            echo "::error::A tag diz $tag e o tauri.conf.json diz $config. Elas têm que bater."
+            exit 1
+          fi
+          echo "Ambos em $config."
+
   bundle:
     name: Empacota para ${{ matrix.label }}
+    needs: check-version
     permissions:
       contents: write
     strategy:
@@ -56,10 +77,35 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these the bundle step fails outright, because the config
+          # asks for updater artifacts and an unsigned one would be refused by
+          # every app it reached.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: markdown-viewer __VERSION__
           releaseBody: Baixe abaixo o pacote do seu sistema.
-          releaseDraft: false
+          # Kept a draft until every platform has uploaded. A release that is
+          # already public carries a `latest.json` naming platforms whose files
+          # are still being built, and an app that asks in that window is
+          # offered an update it cannot download.
+          releaseDraft: true
           prerelease: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  publish:
+    name: Publica a release
+    needs: bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tira a release do rascunho
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Only now does `releases/latest/download/latest.json` start answering,
+        # and by now every file it names is in place.
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --repo "$GITHUB_REPOSITORY"

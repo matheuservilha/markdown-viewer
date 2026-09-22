@@ -30,6 +30,7 @@ import { installAppMenu, menuPlan, type CommandId } from './app-menu'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { InfoPanel } from './InfoPanel'
 import { MeasureGuides } from './MeasureGuides'
+import { UpdateNotice } from './UpdateNotice'
 import { Recents } from './Recents'
 import { SettingsWindow } from './SettingsWindow'
 import { SidebarResizer } from './SidebarResizer'
@@ -1026,6 +1027,8 @@ export function App() {
       )}
 
       <MeasureGuides active={measuring && activeTab !== null} />
+
+      <UpdateNotice />
 
       {state.error && (
         <div className="toast" role="alert">

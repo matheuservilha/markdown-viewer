@@ -121,6 +121,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .manage(Opened::default())
         .invoke_handler(tauri::generate_handler![
             allow_base,
@@ -137,6 +138,11 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // The updater only exists on the desktop, and the interface is
+            // what decides when to look: see `src/app/updates.ts`.
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
             queue_opened(app.handle(), paths_from_arguments());
             Ok(())
         })
