@@ -22,6 +22,7 @@ import {
 } from '@tauri-apps/plugin-fs'
 import {
   baseName,
+  nativeBaseName,
   compareEntries,
   copyName,
   entryId,
@@ -38,10 +39,6 @@ import {
 } from './fs'
 import { decode } from './text'
 
-function basename(path: string): string {
-  return path.split('/').findLast(Boolean) ?? path
-}
-
 export class TauriFileSystem implements FileSystem {
   /** Base id is the absolute path of the root, which is already unique. */
   private roots = new Map<string, string>()
@@ -52,7 +49,7 @@ export class TauriFileSystem implements FileSystem {
 
     await invoke('allow_base', { path: picked })
     this.roots.set(picked, picked)
-    return { id: picked, name: basename(picked), label: picked }
+    return { id: picked, name: nativeBaseName(picked), label: picked }
   }
 
   async openFile(): Promise<LooseFile | null> {
@@ -66,7 +63,7 @@ export class TauriFileSystem implements FileSystem {
     // The file is its own base: the root of that base is the file itself, so
     // the empty path resolves straight to it.
     this.roots.set(picked, picked)
-    return { baseId: picked, name: basename(picked), label: picked }
+    return { baseId: picked, name: nativeBaseName(picked), label: picked }
   }
 
   /**
@@ -81,7 +78,7 @@ export class TauriFileSystem implements FileSystem {
       return { status: 'gone' }
     }
     this.roots.set(baseId, baseId)
-    return { status: 'ok', value: { id: baseId, name: basename(baseId), label: baseId } }
+    return { status: 'ok', value: { id: baseId, name: nativeBaseName(baseId), label: baseId } }
   }
 
   async restoreFile(baseId: string): Promise<Restored<LooseFile>> {
@@ -92,7 +89,7 @@ export class TauriFileSystem implements FileSystem {
       return { status: 'gone' }
     }
     this.roots.set(baseId, baseId)
-    return { status: 'ok', value: { baseId, name: basename(baseId), label: baseId } }
+    return { status: 'ok', value: { baseId, name: nativeBaseName(baseId), label: baseId } }
   }
 
   async list(baseId: string, path: string): Promise<Entry[]> {

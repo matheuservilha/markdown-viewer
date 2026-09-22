@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadSession, saveSession, type Session, type ViewState } from '~/app/session'
 import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
-import { baseName, entryId, parentPath, type Entry } from '~/platform/fs'
+import { entryId, nativeBaseName, parentPath, type Entry } from '~/platform/fs'
 import type { Heading } from '~/editor/outline'
 import { EditorView, type Command } from '@codemirror/view'
 import { redo, undo } from '@codemirror/commands'
@@ -414,7 +414,7 @@ export function App() {
         void actions.openRecentFile({
           baseId: path,
           path: '',
-          name: baseName(path),
+          name: nativeBaseName(path),
           label: path,
           at: Date.now(),
         })

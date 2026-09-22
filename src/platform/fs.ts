@@ -153,6 +153,35 @@ export function baseName(path: string): string {
   return cut < 0 ? path : path.slice(cut + 1)
 }
 
+/**
+ * The last piece of a path that came from the operating system.
+ *
+ * Deliberately not the same function as `baseName`. Paths inside a base are
+ * this app's own, always joined with `/`, and on macOS and Linux a backslash
+ * is a perfectly legal character in a file name: splitting those on `\` would
+ * cut real names in half. A path handed over by Windows, on the other hand,
+ * is separated by backslashes and by nothing else, and a name cut from it with
+ * `/` alone comes back as the whole path, which is what the tab was showing.
+ */
+export function nativeBaseName(path: string): string {
+  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  const name = cut < 0 ? path : path.slice(cut + 1)
+  // A path that ends in its separator, as a dropped folder can, still has a
+  // name one step up.
+  return name === '' ? nativeBaseName(path.slice(0, -1)) : name
+}
+
+/**
+ * The name without its extension, for showing rather than for addressing.
+ *
+ * A leading dot is not an extension: `.gitignore` is the whole name, and
+ * cutting at that dot would leave nothing at all.
+ */
+export function withoutExtension(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot <= 0 ? name : name.slice(0, dot)
+}
+
 /** `nota.md` becomes `nota copia.md`, keeping the extension where it belongs. */
 export function copyName(name: string, suffix: string): string {
   const dot = name.lastIndexOf('.')

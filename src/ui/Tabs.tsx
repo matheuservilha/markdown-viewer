@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { State } from '~/app/store'
 import { CloseIcon } from './icons'
+import { withoutExtension } from '~/platform/fs'
 
 interface Props {
   state: State
@@ -35,7 +36,10 @@ export const Tabs = memo(function Tabs({ state, onActivate, onPin, onClose }: Pr
               if (event.key === 'Enter') onActivate(tab.id)
             }}
           >
-            <span className="tab-name">{tab.name}</span>
+            {/* The extension says nothing here: every tab in this editor is
+                a text file, and the strip is the narrowest place in the
+                window. The full path is still on the tab's own tooltip. */}
+            <span className="tab-name">{withoutExtension(tab.name)}</span>
             {/* The dot marks unsaved work, and gives way to the close button
                 on hover so that a dirty tab is still closable in one click. */}
             <span className="tab-dot" aria-label="Não salvo" />
