@@ -46,16 +46,17 @@ export interface Messages {
 
   'dock:state': DockState
 
-  /** The pointer came to rest on the square at this place in the column. */
-  'dock:hover': { index: number }
   /**
-   * The pointer left that square while still inside the window: moving to
-   * another square, or into the gap between two. It is only the quick half of
-   * noticing; the app's window watches the pointer itself for the other half,
-   * because a panel is not told when the pointer leaves the window entirely.
+   * Which tab the pointer is over, or -1 for none.
+   *
+   * The tabs do not work this out for themselves. A window is only sent
+   * mouse-moved events while its application is the active one, and this one
+   * is on top of everybody else's work precisely so that it never has to be:
+   * the first click on another app would end the hovering for good. So the
+   * app's window has the system watch the pointer, and says what it saw.
    */
-  'dock:leave': null
-  /** The square that writes a new note was clicked. */
+  'dock:near': { index: number }
+  /** The tab that writes a new note was clicked. */
   'dock:new': null
 
   'peek:note': PeekNote | null

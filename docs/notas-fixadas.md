@@ -40,10 +40,24 @@ A abinha de baixo, a do `+`, é vazada e veste a cor que a próxima nota vai ter
 Clicar nela escreve um rascunho novo, que vira mais uma abinha na coluna e uma
 aba não salva na janela principal.
 
-Quem fecha a nota é a janela principal, perguntando ao sistema onde o ponteiro
-está umas dezesseis vezes por segundo. Perguntar aos painéis não funciona:
-janela que fica sempre por cima e nunca foi clicada não é a janela ativa, e não
-recebe do sistema o aviso de que o ponteiro saiu.
+## Por que o ponteiro é vigiado do lado do Rust
+
+As abinhas não descobrem sozinhas que o mouse chegou. No macOS, uma janela só
+recebe evento de mouse se movendo enquanto o app dela é o app ativo, e esta
+fica por cima do trabalho dos outros justamente para nunca precisar ser. O
+primeiro clique em qualquer outro programa acabaria com o hover para sempre.
+
+Então quem vigia é uma linha de execução do lado do Rust, em
+`src-tauri/src/pointer.rs`. Ela pergunta ao sistema onde o ponteiro está a cada
+45 ms, decide sobre qual abinha ele está, e avisa só quando a resposta muda. A
+janela principal recebe esse aviso, acende a abinha e abre a nota. As abinhas
+não adivinham nada: elas são informadas.
+
+A mãozinha do cursor vem do mesmo lugar, e pelo mesmo motivo. O jeito normal,
+que é a janela dizer qual cursor ela quer, passa pelas áreas de cursor do app
+dono da janela, e o sistema só consulta as do app ativo. No Windows e no Linux
+o CSS resolve; no macOS o cursor é trocado direto, na mesma linha de execução
+que vigia o ponteiro.
 
 ## Fechar o app não fecha as notas
 

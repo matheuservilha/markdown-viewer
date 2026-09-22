@@ -2022,19 +2022,22 @@ html[data-window='peek'] body {
 }
 
 /*
- * The pointer keeps its ordinary arrow over the whole column.
+ * The arrow everywhere but on a tab, where it is a hand.
  *
- * A tab is something the pointer passes over on its way somewhere else, not a
- * link. Turning the arrow into a hand every time somebody crosses the edge of
- * the screen makes the edge of the screen feel like a control panel, which is
- * the opposite of what it is for. It stays the arrow even on the tabs, and
- * what a click does is said in words on the note that floats out.
+ * On Windows and Linux this is the whole of it. On macOS it is only half: the
+ * system decides a window's cursor from the cursor rectangles of the
+ * application that owns it, and consults those only for the application that
+ * is active, which this one is not and is not meant to be. There the cursor is
+ * set outright from the thread that watches the pointer, in `pointer.rs`.
  */
 html[data-window='dock'],
-html[data-window='dock'] body,
-html[data-window='dock'] .chip {
+html[data-window='dock'] body {
   cursor: default;
   user-select: none;
+}
+
+html[data-window='dock'] .chip {
+  cursor: pointer;
 }
 
 /*

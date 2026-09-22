@@ -16,7 +16,6 @@ import {
   dockRect,
   maxPeekHeight,
   peekRect,
-  within,
   type Area,
   type Rect,
   type Side,
@@ -36,27 +35,24 @@ import {
 } from '~/app/pinned'
 import { noteTitle } from '~/app/drafts'
 import {
-  cursorAt,
   hidePanel,
+  onChipUnderPointer,
   placePanel,
   preparePanel,
   showMainWindow,
+  watchChips,
   workArea,
 } from '~/platform/panels'
 import { on, send, type DockState, type PeekNote } from '~/platform/channel'
 
-/** How often the pointer is looked up while a note is showing. */
-const WATCH_EVERY = 60
 /**
- * How many readings in a row have to land off the tab before the note goes.
+ * How long the pointer has to stay on one tab before its note floats out.
  *
- * One is too few: a square leans away from the edge when the pointer arrives,
- * and for a frame the pointer can be reading as just outside the square it is
- * sitting perfectly still on.
+ * Long enough that running the pointer down the column does not fire off four
+ * notes on the way past, short enough that stopping on one does not feel like
+ * waiting.
  */
-const WATCH_MISSES = 2
-/** How far past the edge of a tab still counts as being on it. */
-const WATCH_SLACK = 7
+const PEEK_DELAY = 90
 /** The note opens at this height unless the screen is too short for it. */
 const PEEK_HEIGHT = 420
 
@@ -97,6 +93,14 @@ export function useDock(options: DockOptions) {
   /** The tab whose note is showing, in screen pixels. */
   const chip = useRef<Rect | null>(null)
 
+  /**
+   * Puts the column where it goes, and hands the system the rectangle of every
+   * tab in it so that the pointer can be watched against them.
+   *
+   * The two happen together on purpose: the rectangles are only true for the
+   * placement they were computed from, and a column that gained a note has
+   * moved every tab in it.
+   */
   const place = useCallback(async (count: number, side: Side, fresh = false) => {
     if (!latest.current.options.enabled) return
     const screen = await workArea(fresh)
@@ -105,6 +109,7 @@ export function useDock(options: DockOptions) {
     area.current = screen
     dock.current = rect
     await placePanel('dock', rect)
+    await watchChips(Array.from({ length: count }, (_, index) => chipRect(rect, index)))
   }, [])
 
   const closePeek = useCallback(async () => {
@@ -112,51 +117,6 @@ export function useDock(options: DockOptions) {
     send('peek:note', null)
     await hidePanel('peek')
   }, [])
-
-  /**
-   * Noticing that the pointer has left the tab.
-   *
-   * The tab cannot be asked once the pointer is outside its window. A window
-   * that is always on top and was never clicked is not the active window, and
-   * its webview is not reliably told that the pointer went away. So the
-   * pointer is looked up from the system a few times a second and put against
-   * the tab the note belongs to.
-   *
-   * Only the tab counts. Landing on the note itself closes it, the same as
-   * landing anywhere else: the note is something you glance at, not something
-   * you travel to.
-   */
-  const watching = useRef(0)
-  const misses = useRef(0)
-
-  const stopWatching = useCallback(() => {
-    window.clearInterval(watching.current)
-    watching.current = 0
-  }, [])
-
-  const startWatching = useCallback(() => {
-    misses.current = 0
-    if (watching.current !== 0) return
-    watching.current = window.setInterval(() => {
-      void (async () => {
-        const target = chip.current
-        if (!target) {
-          stopWatching()
-          return
-        }
-        const at = await cursorAt()
-        if (!at) return
-        if (within(target, at.x, at.y, WATCH_SLACK)) {
-          misses.current = 0
-          return
-        }
-        misses.current += 1
-        if (misses.current < WATCH_MISSES) return
-        stopWatching()
-        void closePeek()
-      })()
-    }, WATCH_EVERY)
-  }, [closePeek, stopWatching])
 
   /** Opens the note beside the tab the pointer came to rest on. */
   const showPeek = useCallback(async (index: number) => {
@@ -213,7 +173,7 @@ export function useDock(options: DockOptions) {
   const count = pins.length + 1
   useEffect(() => {
     if (!options.enabled) {
-      stopWatching()
+      void watchChips([])
       void hidePanel('dock')
       void hidePanel('peek')
       return
@@ -222,7 +182,7 @@ export function useDock(options: DockOptions) {
     // The note has about a tenth of a second to appear, which is not long
     // enough to load a window from nothing.
     void preparePanel('peek')
-  }, [options.enabled, options.side, count, place, stopWatching])
+  }, [options.enabled, options.side, count, place])
 
   const openInApp = useCallback(
     (id: string) => {
@@ -230,11 +190,43 @@ export function useDock(options: DockOptions) {
       if (!pin) return
       latest.current.options.onOpenInApp(pin)
       void showMainWindow()
-      stopWatching()
       void closePeek()
     },
-    [closePeek, stopWatching],
+    [closePeek],
   )
+
+  /**
+   * Which tab the pointer is over, as the system reports it.
+   *
+   * This is the whole of the hovering. The tabs themselves are never asked,
+   * and they no longer guess: they are told which one to light up, and the
+   * note opens beside whichever one the pointer settles on.
+   *
+   * The wait is here and not in the other window so that the tab lights up the
+   * instant the pointer arrives while the note, which costs a window, waits
+   * for the pointer to mean it.
+   */
+  const settling = useRef(0)
+  useEffect(() => {
+    if (!options.enabled) return
+    return onChipUnderPointer((index) => {
+      window.clearTimeout(settling.current)
+      send('dock:near', { index })
+      if (index < 0) {
+        void closePeek()
+        return
+      }
+      // The last tab is the one that writes a new note. It has none of its own
+      // to show, so whatever was showing is put away.
+      if (index >= latest.current.pins.length) {
+        void closePeek()
+        return
+      }
+      settling.current = window.setTimeout(() => void showPeek(index), PEEK_DELAY)
+    })
+  }, [options.enabled, closePeek, showPeek])
+
+  useEffect(() => () => window.clearTimeout(settling.current), [])
 
   // One listener per message, bound once. They read through `latest` rather
   // than closing over the state, so none of them is rebound as things change.
@@ -244,21 +236,10 @@ export function useDock(options: DockOptions) {
         if (role === 'dock') send('dock:state', latestState.current)
       }),
 
-      on('dock:hover', ({ index }) => {
-        void showPeek(index)
-        startWatching()
-      }),
-
-      on('dock:leave', () => {
-        stopWatching()
-        void closePeek()
-      }),
-
       on('dock:new', () => {
         const target = latest.current.options.onNewNote()
         if (!target) return
         setPins((current) => addPin(current, target))
-        stopWatching()
         void closePeek()
       }),
 
@@ -267,9 +248,8 @@ export function useDock(options: DockOptions) {
 
     return () => {
       for (const stop of stops) stop()
-      stopWatching()
     }
-  }, [closePeek, openInApp, showPeek, startWatching, stopWatching])
+  }, [closePeek, openInApp])
 
   const toggle = useCallback((target: PinTarget) => {
     setPins((current) =>

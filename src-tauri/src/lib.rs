@@ -1,4 +1,5 @@
 mod panels;
+mod pointer;
 mod tray;
 
 use std::sync::Mutex;
@@ -147,6 +148,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(Opened::default())
         .manage(panels::Scale::default())
+        .manage(pointer::Watch::default())
         .invoke_handler(tauri::generate_handler![
             allow_base,
             move_to_trash,
@@ -157,6 +159,7 @@ pub fn run() {
             panels::panel_place,
             panels::panel_prepare,
             panels::cursor_at,
+            pointer::watch_chips,
             panels::panel_hide,
             panels::panel_is_open,
             panels::show_main,

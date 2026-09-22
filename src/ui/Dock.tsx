@@ -11,19 +11,10 @@
  * everything the pointer does here leaves as a message.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { pinTitle, type Pin } from '~/app/pinned'
 import { on, send, type DockState } from '~/platform/channel'
 import { PlusIcon } from './icons'
-
-/**
- * How long the pointer has to rest on a square before its note floats out.
- *
- * Long enough that running the pointer down the column does not fire off four
- * notes on the way past, short enough that stopping on one does not feel like
- * waiting.
- */
-const PEEK_DELAY = 95
 
 const EMPTY: DockState = {
   pins: [],
@@ -35,64 +26,34 @@ const EMPTY: DockState = {
 
 export function Dock() {
   const [state, setState] = useState<DockState>(EMPTY)
-  /** Which tab the pointer is on, so it can grow to meet it. */
-  const [near, setNear] = useState<number | null>(null)
-  const timer = useRef(0)
+  /**
+   * Which tab the pointer is on, so it can grow to meet it.
+   *
+   * It arrives as a message rather than from a pointer event of our own. A
+   * window is only sent mouse-moved events while its application is the
+   * active one, and this one is on top of everybody else's work precisely so
+   * that it never has to be: the first click on another app would end the
+   * hovering for good. The app's window has the system watch the pointer, and
+   * tells us what it saw.
+   */
+  const [near, setNear] = useState(-1)
 
   // The app's window may have been running for hours before this one opened,
   // so it asks rather than waiting to be told.
   useEffect(() => {
-    const stop = on('dock:state', setState)
+    const stops = [on('dock:state', setState), on('dock:near', ({ index }) => setNear(index))]
     send('panel:hello', { role: 'dock' })
-    return stop
+    return () => {
+      for (const stop of stops) stop()
+    }
   }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = state.theme
   }, [state.theme])
 
-  useEffect(() => () => window.clearTimeout(timer.current), [])
-
-  const enter = (index: number) => {
-    setNear(index)
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => send('dock:hover', { index }), PEEK_DELAY)
-  }
-
-  /**
-   * The pointer slid off a tab but is still in this window, in the air between
-   * two tabs or on its way to another.
-   *
-   * The tab shrinks back at once, and the note is left to the app's window to
-   * close. Saying "gone" here would close a note that the next square is
-   * about to replace a few milliseconds later, and the pair would read as a
-   * blink rather than as a move.
-   */
-  const leaveChip = () => {
-    setNear(null)
-    window.clearTimeout(timer.current)
-  }
-
-  /**
-   * The pointer left the column altogether.
-   *
-   * This is the quick half of noticing; it only fires while the system still
-   * thinks the pointer belongs to this window, which it does not once the
-   * pointer is well away. The other half is the app's window, which watches
-   * where the pointer actually is.
-   */
-  const leaveColumn = () => {
-    leaveChip()
-    send('dock:leave', null)
-  }
-
-  const addNote = () => {
-    leaveColumn()
-    send('dock:new', null)
-  }
-
   return (
-    <div className="dock" data-side={state.side} onPointerLeave={leaveColumn}>
+    <div className="dock" data-side={state.side}>
       <div className="dock-column">
         {state.pins.map((pin: Pin, index) => (
           <button
@@ -109,8 +70,6 @@ export function Dock() {
             style={{ animationDelay: index * 45 + 'ms' }}
             aria-label={pinTitle(pin)}
             title={pinTitle(pin)}
-            onPointerEnter={() => enter(index)}
-            onPointerLeave={leaveChip}
             onClick={() => send('note:open-in-app', { id: pin.id })}
           >
             <span className="chip-face">
@@ -123,21 +82,12 @@ export function Dock() {
             says what it is about to make. */}
         <button
           type="button"
-          className={'chip is-new' + (near === -1 ? ' is-near' : '')}
+          className={'chip is-new' + (near === state.pins.length ? ' is-near' : '')}
           data-color={state.nextColor}
           style={{ animationDelay: state.pins.length * 45 + 'ms' }}
           aria-label="Nova nota"
           title="Nova nota"
-          // Moving onto this one puts away whatever note was showing: it has
-          // none of its own, and a note left open beside it would look like
-          // the note this tab is about to write.
-          onPointerEnter={() => {
-            setNear(-1)
-            window.clearTimeout(timer.current)
-            send('dock:leave', null)
-          }}
-          onPointerLeave={leaveChip}
-          onClick={addNote}
+          onClick={() => send('dock:new', null)}
         >
           <span className="chip-face">
             <PlusIcon size={14} className="chip-plus" />

@@ -67,19 +67,42 @@ export async function placePanel(
 }
 
 /**
- * Where the pointer is, in the same pixels `workArea` reports.
+ * Watches the pointer against these rectangles, and says which one it is over.
  *
- * Asked of the system rather than of the panels, because a panel that is
- * always on top and was never clicked does not reliably hear that the pointer
- * left it.
+ * The tabs cannot notice the pointer themselves. On macOS a window is only
+ * sent mouse-moved events while its application is the active one, and this
+ * one is on top of everybody else's work precisely so that it never has to be.
+ * The first click on another app would end the hovering for good.
+ *
+ * So the system is asked instead, on the other side, by a thread that reports
+ * only when the answer changes. An empty list stops the watching.
  */
-export async function cursorAt(): Promise<{ x: number; y: number } | null> {
-  if (!isDesktop()) return null
+export async function watchChips(rects: readonly Rect[]): Promise<void> {
+  if (!isDesktop()) return
   try {
-    const [x, y] = await invoke<[number, number]>('cursor_at')
-    return { x, y }
+    await invoke('watch_chips', { rects })
   } catch {
-    return null
+    // Nothing to watch with. The tabs still answer to a click.
+  }
+}
+
+/** The index of the tab the pointer is over, or -1, whenever that changes. */
+export function onChipUnderPointer(handle: (index: number) => void): () => void {
+  if (!isDesktop()) return () => {}
+  let stop: (() => void) | null = null
+  let cancelled = false
+
+  void import('@tauri-apps/api/event')
+    .then(({ listen }) => listen<number>('pointer:chip', (event) => handle(event.payload)))
+    .then((off) => {
+      if (cancelled) off()
+      else stop = off
+    })
+    .catch(() => {})
+
+  return () => {
+    cancelled = true
+    stop?.()
   }
 }
 
