@@ -27,21 +27,26 @@ export interface Rect {
   height: number
 }
 
-/** The side of one square. */
-export const SQUARE = 26
-/** Air between two squares. */
-export const SQUARE_GAP = 9
-/** Air above the first square and below the last. */
-export const COLUMN_PAD = 8
 /**
- * How far a square is inset from the edge of the screen, and therefore how
- * much room is left on the other side of the window for it to lean out into
- * when the pointer arrives.
+ * The tabs are cut off by the edge of the screen on purpose.
+ *
+ * Each one is a rounded rectangle whose outer half is past the edge of the
+ * monitor: what shows is the inner half, rounded on the inside and cut square
+ * on the outside. They never come away from the edge. The pointer arriving
+ * pulls more of one into view rather than sliding it inward, so the edge of
+ * the screen stays the edge of the tab.
  */
-export const SQUARE_INSET = 5
-export const LEAN = 9
-/** The window that holds the column: one square wide, plus room to lean. */
-export const DOCK_WIDTH = SQUARE + SQUARE_INSET + LEAN
+export const CHIP_HEIGHT = 30
+/** How much of a tab shows when nothing is pointing at it. */
+export const CHIP_REST = 16
+/** And how much shows when something is. */
+export const CHIP_NEAR = 30
+/** Air between two tabs. */
+export const CHIP_GAP = 9
+/** Air above the first tab and below the last. */
+export const COLUMN_PAD = 8
+/** The window is as wide as the widest a tab ever gets, and no wider. */
+export const DOCK_WIDTH = CHIP_NEAR
 
 export const PEEK_WIDTH = 392
 export const PEEK_MIN_HEIGHT = 220
@@ -54,22 +59,22 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
-/** How tall a column of `count` squares is, with its air. */
+/** How tall a column of `count` tabs is, with its air. */
 export function columnHeight(count: number): number {
-  const squares = Math.max(count, 1)
-  return COLUMN_PAD * 2 + squares * SQUARE + (squares - 1) * SQUARE_GAP
+  const tabs = Math.max(count, 1)
+  return COLUMN_PAD * 2 + tabs * CHIP_HEIGHT + (tabs - 1) * CHIP_GAP
 }
 
 /**
- * The window that holds the squares: flush against its edge, centred on the
+ * The window that holds the tabs: flush against its edge, centred on the
  * height of the screen.
  *
  * It sits on the edge rather than near it because the edge is the one place a
  * pointer can reach without aiming. Throwing the mouse at the side of the
  * screen lands on the column every time.
  *
- * `count` is the number of squares, the notes plus the one that writes a new
- * one, so the window is exactly as tall as what is in it and no taller. A
+ * `count` is the number of tabs, the notes plus the one that writes a new one,
+ * so the window is exactly as tall as what is in it and no taller. A
  * transparent window that is bigger than its contents is a piece of screen
  * that silently swallows clicks.
  */
@@ -84,19 +89,22 @@ export function dockRect(area: Area, side: Side, count: number): Rect {
 }
 
 /**
- * One square, on the screen.
+ * One tab, on the screen, at the width it has while it is being pointed at.
  *
- * The app's window needs this to tell whether the pointer is still on the
- * square whose note is showing. The square itself knows where it is, but it
- * cannot be asked: a window that is always on top and was never clicked is not
- * the active window, and is not reliably told that the pointer left it.
+ * The app's window needs this to tell whether the pointer is still on the tab
+ * whose note is showing. The tab itself knows where it is, but it cannot be
+ * asked: a window that is always on top and was never clicked is not the
+ * active window, and is not reliably told that the pointer left it.
+ *
+ * It is the pointed-at width and not the resting one because by the time
+ * anyone asks, the tab has already grown to meet the pointer.
  */
-export function squareRect(dock: Rect, side: Side, index: number): Rect {
+export function chipRect(dock: Rect, index: number): Rect {
   return {
-    x: side === 'right' ? dock.x + LEAN : dock.x + SQUARE_INSET,
-    y: dock.y + COLUMN_PAD + index * (SQUARE + SQUARE_GAP),
-    width: SQUARE,
-    height: SQUARE,
+    x: dock.x,
+    y: dock.y + COLUMN_PAD + index * (CHIP_HEIGHT + CHIP_GAP),
+    width: dock.width,
+    height: CHIP_HEIGHT,
   }
 }
 

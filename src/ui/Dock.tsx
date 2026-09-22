@@ -1,10 +1,11 @@
 /**
- * The squares on the edge of the screen.
+ * The tabs on the edge of the screen.
  *
  * One per pinned note, in its colour, plus one at the bottom that writes a new
- * one. That is the whole of it: there is no list, nothing opens, nothing is
- * fixed. The pointer rests on a square and the note floats out to be read; the
- * pointer leaves and it is gone.
+ * one. Each is a rounded rectangle cut in half by the edge of the monitor, and
+ * the pointer arriving pulls more of it into view. That is the whole of it:
+ * there is no list, nothing opens, nothing is fixed. The pointer rests on a
+ * tab and the note floats out to be read; the pointer leaves and it is gone.
  *
  * It owns nothing. The notes and the colours arrive from the app's window, and
  * everything the pointer does here leaves as a message.
@@ -34,7 +35,7 @@ const EMPTY: DockState = {
 
 export function Dock() {
   const [state, setState] = useState<DockState>(EMPTY)
-  /** Which square the pointer is on, so it can lean out to meet it. */
+  /** Which tab the pointer is on, so it can grow to meet it. */
   const [near, setNear] = useState<number | null>(null)
   const timer = useRef(0)
 
@@ -59,11 +60,11 @@ export function Dock() {
   }
 
   /**
-   * The pointer slid off a square but is still in this window, in the air
-   * between two squares or on its way to another.
+   * The pointer slid off a tab but is still in this window, in the air between
+   * two tabs or on its way to another.
    *
-   * The square stops leaning at once, and the note is left to the app's window
-   * to close. Saying "gone" here would close a note that the next square is
+   * The tab shrinks back at once, and the note is left to the app's window to
+   * close. Saying "gone" here would close a note that the next square is
    * about to replace a few milliseconds later, and the pair would read as a
    * blink rather than as a move.
    */
@@ -117,7 +118,7 @@ export function Dock() {
           </button>
         ))}
 
-        {/* Wearing the colour the next note will be born with, so the square
+        {/* Wearing the colour the next note will be born with, so the tab
             says what it is about to make. */}
         <button
           type="button"
@@ -128,7 +129,7 @@ export function Dock() {
           title="Nova nota"
           // Moving onto this one puts away whatever note was showing: it has
           // none of its own, and a note left open beside it would look like
-          // the note this square is about to write.
+          // the note this tab is about to write.
           onPointerEnter={() => {
             setNear(-1)
             window.clearTimeout(timer.current)

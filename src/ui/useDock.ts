@@ -1,5 +1,5 @@
 /**
- * The app's window driving the squares and the note that floats out of them.
+ * The app's window driving the tabs and the note that floats out of them.
  *
  * Everything the two panels show is decided here, and so is where on the
  * screen they go. They are views; this is the only copy of the list and the
@@ -10,12 +10,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  CHIP_HEIGHT,
   PEEK_MIN_HEIGHT,
-  SQUARE,
+  chipRect,
   dockRect,
   maxPeekHeight,
   peekRect,
-  squareRect,
   within,
   type Area,
   type Rect,
@@ -48,20 +48,20 @@ import { on, send, type DockState, type PeekNote } from '~/platform/channel'
 /** How often the pointer is looked up while a note is showing. */
 const WATCH_EVERY = 60
 /**
- * How many readings in a row have to land off the square before the note goes.
+ * How many readings in a row have to land off the tab before the note goes.
  *
  * One is too few: a square leans away from the edge when the pointer arrives,
  * and for a frame the pointer can be reading as just outside the square it is
  * sitting perfectly still on.
  */
 const WATCH_MISSES = 2
-/** How far past the edge of a square still counts as being on it. */
+/** How far past the edge of a tab still counts as being on it. */
 const WATCH_SLACK = 7
 /** The note opens at this height unless the screen is too short for it. */
 const PEEK_HEIGHT = 420
 
 export interface DockOptions {
-  /** Whether the squares are on the edge of the screen at all. */
+  /** Whether the tabs are on the edge of the screen at all. */
   enabled: boolean
   side: Side
   theme: 'light' | 'dark'
@@ -69,9 +69,9 @@ export interface DockOptions {
   dirty: readonly string[]
   /** The text of a pinned note that is still only a draft. */
   draftText: (id: string) => string | undefined
-  /** Asked for by the square that writes a new note. */
+  /** Asked for by the tab that writes a new note. */
   onNewNote: () => PinTarget | null
-  /** Asked for by a click on a square: bring this note into the app. */
+  /** Asked for by a click on a tab: bring this note into the app. */
   onOpenInApp: (pin: Pin) => void
 }
 
@@ -94,8 +94,8 @@ export function useDock(options: DockOptions) {
   /** Where the panels are right now, so the next one can be placed beside it. */
   const area = useRef<Area | null>(null)
   const dock = useRef<Rect | null>(null)
-  /** The square whose note is showing, in screen pixels. */
-  const square = useRef<Rect | null>(null)
+  /** The tab whose note is showing, in screen pixels. */
+  const chip = useRef<Rect | null>(null)
 
   const place = useCallback(async (count: number, side: Side, fresh = false) => {
     if (!latest.current.options.enabled) return
@@ -108,21 +108,21 @@ export function useDock(options: DockOptions) {
   }, [])
 
   const closePeek = useCallback(async () => {
-    square.current = null
+    chip.current = null
     send('peek:note', null)
     await hidePanel('peek')
   }, [])
 
   /**
-   * Noticing that the pointer has left the square.
+   * Noticing that the pointer has left the tab.
    *
-   * The square cannot be asked once the pointer is outside its window. A
-   * window that is always on top and was never clicked is not the active
-   * window, and its webview is not reliably told that the pointer went away.
-   * So the pointer is looked up from the system a few times a second and put
-   * against the square the note belongs to.
+   * The tab cannot be asked once the pointer is outside its window. A window
+   * that is always on top and was never clicked is not the active window, and
+   * its webview is not reliably told that the pointer went away. So the
+   * pointer is looked up from the system a few times a second and put against
+   * the tab the note belongs to.
    *
-   * Only the square counts. Landing on the note itself closes it, the same as
+   * Only the tab counts. Landing on the note itself closes it, the same as
    * landing anywhere else: the note is something you glance at, not something
    * you travel to.
    */
@@ -139,7 +139,7 @@ export function useDock(options: DockOptions) {
     if (watching.current !== 0) return
     watching.current = window.setInterval(() => {
       void (async () => {
-        const target = square.current
+        const target = chip.current
         if (!target) {
           stopWatching()
           return
@@ -158,7 +158,7 @@ export function useDock(options: DockOptions) {
     }, WATCH_EVERY)
   }, [closePeek, stopWatching])
 
-  /** Opens the note beside the square the pointer came to rest on. */
+  /** Opens the note beside the tab the pointer came to rest on. */
   const showPeek = useCallback(async (index: number) => {
     const { pins: known, options: now } = latest.current
     const pin = known[index]
@@ -166,11 +166,11 @@ export function useDock(options: DockOptions) {
     const column = dock.current
     if (!pin || !screen || !column) return
 
-    const target = squareRect(column, now.side, index)
-    square.current = target
+    const target = chipRect(column, index)
+    chip.current = target
 
     const height = Math.max(PEEK_MIN_HEIGHT, Math.min(PEEK_HEIGHT, maxPeekHeight(screen)))
-    const rect = peekRect(screen, now.side, column, height, target.y + SQUARE / 2)
+    const rect = peekRect(screen, now.side, column, height, target.y + CHIP_HEIGHT / 2)
 
     const note: PeekNote = { pin, theme: now.theme }
     const text = isDraftPin(pin) ? now.draftText(pin.id) : undefined
@@ -183,7 +183,7 @@ export function useDock(options: DockOptions) {
     await placePanel('peek', rect)
   }, [])
 
-  // Everything the squares draw, sent again whenever any of it changes.
+  // Everything the tabs draw, sent again whenever any of it changes.
   const state: DockState = useMemo(
     () => ({
       pins,
@@ -208,7 +208,7 @@ export function useDock(options: DockOptions) {
 
   /**
    * The column exists while the setting says so, and is exactly as tall as the
-   * squares in it: one per note, plus the one that writes a new one.
+   * tabs in it: one per note, plus the one that writes a new one.
    */
   const count = pins.length + 1
   useEffect(() => {

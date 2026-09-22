@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CHIP_GAP,
+  CHIP_HEIGHT,
   COLUMN_PAD,
   DOCK_WIDTH,
   PEEK_WIDTH,
-  SQUARE,
-  SQUARE_GAP,
+  chipRect,
   columnHeight,
   dockRect,
   peekRect,
-  squareRect,
   within,
   type Area,
 } from './dock-layout'
@@ -17,12 +17,12 @@ import {
 const SCREEN: Area = { x: 0, y: 25, width: 1440, height: 875 }
 
 describe('columnHeight', () => {
-  it('is one square plus its air when there is one square', () => {
-    expect(columnHeight(1)).toBe(COLUMN_PAD * 2 + SQUARE)
+  it('is one tab plus its air when there is one tab', () => {
+    expect(columnHeight(1)).toBe(COLUMN_PAD * 2 + CHIP_HEIGHT)
   })
 
-  it('adds a gap for each square after the first', () => {
-    expect(columnHeight(4) - columnHeight(3)).toBe(SQUARE + SQUARE_GAP)
+  it('adds a gap for each tab after the first', () => {
+    expect(columnHeight(4) - columnHeight(3)).toBe(CHIP_HEIGHT + CHIP_GAP)
   })
 
   it('never collapses to nothing, so an empty column is still reachable', () => {
@@ -45,6 +45,10 @@ describe('dockRect', () => {
     expect(dockRect(SCREEN, 'right', 5).height).toBe(columnHeight(5))
   })
 
+  it('is exactly as wide as the widest a tab ever gets', () => {
+    expect(dockRect(SCREEN, 'right', 5).width).toBe(DOCK_WIDTH)
+  })
+
   it('stays centred on the work area, not on the screen', () => {
     const rect = dockRect(SCREEN, 'right', 4)
     const above = rect.y - SCREEN.y
@@ -60,34 +64,29 @@ describe('dockRect', () => {
   })
 })
 
-describe('squareRect', () => {
+describe('chipRect', () => {
   const dock = dockRect(SCREEN, 'right', 3)
 
-  it('leaves room on the inner side for the square to lean into', () => {
-    const square = squareRect(dock, 'right', 0)
-    expect(square.x).toBeGreaterThan(dock.x)
-    expect(square.x + square.width).toBeLessThan(dock.x + dock.width)
+  it('runs the full width of the column, which is how wide a tab gets', () => {
+    const chip = chipRect(dock, 0)
+    expect(chip.x).toBe(dock.x)
+    expect(chip.width).toBe(dock.width)
   })
 
-  it('stacks the squares down the column', () => {
-    expect(squareRect(dock, 'right', 1).y - squareRect(dock, 'right', 0).y).toBe(
-      SQUARE + SQUARE_GAP,
-    )
+  it('reaches the edge of the screen, because the tab is cut off by it', () => {
+    expect(chipRect(dock, 0).x + chipRect(dock, 0).width).toBe(SCREEN.x + SCREEN.width)
   })
 
-  it('keeps every square inside the window it lives in', () => {
+  it('stacks the tabs down the column', () => {
+    expect(chipRect(dock, 1).y - chipRect(dock, 0).y).toBe(CHIP_HEIGHT + CHIP_GAP)
+  })
+
+  it('keeps every tab inside the window it lives in', () => {
     for (let index = 0; index < 3; index++) {
-      const square = squareRect(dock, 'right', index)
-      expect(square.y).toBeGreaterThanOrEqual(dock.y)
-      expect(square.y + square.height).toBeLessThanOrEqual(dock.y + dock.height)
+      const chip = chipRect(dock, index)
+      expect(chip.y).toBeGreaterThanOrEqual(dock.y)
+      expect(chip.y + chip.height).toBeLessThanOrEqual(dock.y + dock.height)
     }
-  })
-
-  it('leans the other way on the left edge', () => {
-    const left = dockRect(SCREEN, 'left', 3)
-    const square = squareRect(left, 'left', 0)
-    expect(square.x).toBeGreaterThanOrEqual(left.x)
-    expect(square.x + square.width).toBeLessThan(left.x + left.width)
   })
 })
 
@@ -107,7 +106,7 @@ describe('within', () => {
     expect(within(rect, 120, 241)).toBe(false)
   })
 
-  it('lets the slack cover a square that leaned away from the pointer', () => {
+  it('lets the slack cover a tab still growing to meet the pointer', () => {
     expect(within(rect, 95, 220, 6)).toBe(true)
     expect(within(rect, 93, 220, 6)).toBe(false)
   })

@@ -2031,7 +2031,15 @@ html[data-window='peek'] body {
   --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
 }
 
-/* ---------------------------------------------------------- os quadradinhos */
+/* ------------------------------------------------------------- as abinhas */
+
+/*
+ * Each tab is a rounded rectangle whose outer half is past the edge of the
+ * monitor. What shows is the inner half: rounded on the inside, cut square on
+ * the outside by the screen itself. They never come away from the edge, and
+ * the pointer arriving pulls more of one into view rather than sliding it
+ * inward, so the edge of the screen stays the edge of the tab.
+ */
 
 .dock {
   display: flex;
@@ -2047,49 +2055,27 @@ html[data-window='peek'] body {
   padding: 8px 0;
 }
 
+/* The button is the hit area, always the full width of the column, so the
+   pointer keeps hold of a tab that is still growing under it. */
 .chip {
   position: relative;
-  display: flex;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 100%;
+  height: 30px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
 
-  /* Each square comes in from behind the edge of the screen, one after the
-     other, so a column that just gained a note grows rather than blinks. */
-  animation: chip-in 260ms var(--spring) backwards;
-  transition: transform 180ms var(--spring);
-}
-
-/* The lean out to meet the pointer, towards the middle of the screen, which is
-   the only direction there is anything to lean into. */
-.dock[data-side='right'] .chip {
-  align-self: flex-end;
-  margin-right: 5px;
-}
-
-.dock[data-side='left'] .chip {
-  align-self: flex-start;
-  margin-left: 5px;
-}
-
-.dock[data-side='right'] .chip.is-near {
-  transform: translateX(-9px);
-}
-
-.dock[data-side='left'] .chip.is-near {
-  transform: translateX(9px);
+  /* Each tab comes in from behind the edge of the screen, one after the other,
+     so a column that just gained a note grows rather than blinks. */
+  animation: chip-in 280ms var(--spring) backwards;
 }
 
 @keyframes chip-in {
   from {
     opacity: 0;
-    transform: translateX(14px) scale(0.7);
+    transform: translateX(16px);
   }
 }
 
@@ -2100,34 +2086,46 @@ html[data-window='peek'] body {
 @keyframes chip-in-left {
   from {
     opacity: 0;
-    transform: translateX(-14px) scale(0.7);
+    transform: translateX(-16px);
   }
 }
 
-/* The coloured tile itself. It is a child and not the button, so it can grow
-   under the pointer while the button stays the size of its hit area. */
+/*
+ * The coloured face. It is a child and not the button so that it can grow
+ * while the hit area stays put: a tab that changed size and took its own hit
+ * area with it would shake under a pointer resting on its edge.
+ */
 .chip-face {
   position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: linear-gradient(160deg, color-mix(in oklab, var(--pin) 88%, white), var(--pin));
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  background: linear-gradient(150deg, color-mix(in oklab, var(--pin) 86%, white), var(--pin));
   box-shadow:
-    0 1px 2px rgb(0 0 0 / 28%),
-    0 4px 10px rgb(0 0 0 / 18%),
-    inset 0 1px 0 rgb(255 255 255 / 22%);
+    0 1px 3px rgb(0 0 0 / 26%),
+    0 6px 14px rgb(0 0 0 / 16%);
   transition:
-    transform 180ms var(--spring),
-    box-shadow 180ms var(--spring),
-    border-radius 180ms var(--spring);
+    width 200ms var(--spring),
+    box-shadow 200ms var(--spring);
+}
+
+/* Round on the inside, square on the outside, because the outside is not an
+   edge anybody drew: it is where the monitor stops. */
+.dock[data-side='right'] .chip-face {
+  right: 0;
+  border-radius: 9px 0 0 9px;
+}
+
+.dock[data-side='left'] .chip-face {
+  left: 0;
+  border-radius: 0 9px 9px 0;
 }
 
 .chip.is-near .chip-face {
-  border-radius: 10px;
-  transform: scale(1.09);
+  width: 30px;
   box-shadow:
-    0 2px 4px rgb(0 0 0 / 30%),
-    0 10px 22px rgb(0 0 0 / 26%),
-    inset 0 1px 0 rgb(255 255 255 / 30%);
+    0 2px 5px rgb(0 0 0 / 30%),
+    0 12px 26px rgb(0 0 0 / 26%);
 }
 
 .chip:focus-visible {
@@ -2135,66 +2133,92 @@ html[data-window='peek'] body {
 }
 
 .chip:focus-visible .chip-face {
+  width: 30px;
   box-shadow:
     0 0 0 2px var(--bg-app),
     0 0 0 4px var(--pin);
 }
 
-/* A note with something unwritten in it wears a notch in the corner. */
+/* A note with something unwritten in it wears a notch on its inner edge, where
+   there is always something to see however narrow the tab is. */
 .chip-mark {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
   border-radius: 999px;
   background: rgb(255 255 255 / 92%);
-  box-shadow: 0 0 0 1.5px rgb(0 0 0 / 22%);
+  box-shadow: 0 0 0 1.5px rgb(0 0 0 / 20%);
   opacity: 0;
-  transform: scale(0.4);
-  transition:
-    opacity 160ms var(--spring),
-    transform 160ms var(--spring);
+  transition: opacity 160ms var(--spring);
+}
+
+.dock[data-side='right'] .chip-mark {
+  right: 5px;
+  transform: translateY(-50%);
+}
+
+.dock[data-side='left'] .chip-mark {
+  left: 5px;
+  transform: translateY(-50%);
 }
 
 .chip.is-dirty .chip-mark {
   opacity: 1;
-  transform: scale(1);
 }
 
-/* ---- the square that writes a new note */
+/* ---- the tab that writes a new note */
 
 /*
- * It wears the colour the next note will be born with, so the square says what
- * it is about to make. Hollow until the pointer arrives, so a column of five
+ * It wears the colour the next note will be born with, so the tab says what it
+ * is about to make. Hollow until the pointer arrives, so a column of five
  * notes plus this one still reads as five notes.
  */
 .chip.is-new .chip-face {
-  background: color-mix(in oklab, var(--pin) 16%, transparent);
-  box-shadow:
-    inset 0 0 0 1.5px color-mix(in oklab, var(--pin) 55%, transparent),
-    0 1px 3px rgb(0 0 0 / 16%);
+  background: color-mix(in oklab, var(--pin) 20%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--pin) 50%, transparent);
 }
 
 .chip.is-new.is-near .chip-face {
-  background: linear-gradient(160deg, color-mix(in oklab, var(--pin) 88%, white), var(--pin));
+  background: linear-gradient(150deg, color-mix(in oklab, var(--pin) 86%, white), var(--pin));
   box-shadow:
-    0 2px 4px rgb(0 0 0 / 30%),
-    0 10px 22px rgb(0 0 0 / 26%),
-    inset 0 1px 0 rgb(255 255 255 / 30%);
+    0 2px 5px rgb(0 0 0 / 30%),
+    0 12px 26px rgb(0 0 0 / 26%);
 }
 
 .chip-plus {
-  position: relative;
+  position: absolute;
+  top: 50%;
   color: var(--pin);
   transition:
-    color 180ms var(--spring),
-    transform 260ms var(--spring);
+    color 200ms var(--spring),
+    transform 320ms var(--spring),
+    right 200ms var(--spring),
+    left 200ms var(--spring);
+}
+
+.dock[data-side='right'] .chip-plus {
+  right: 2px;
+  transform: translateY(-50%);
+}
+
+.dock[data-side='left'] .chip-plus {
+  left: 2px;
+  transform: translateY(-50%);
+}
+
+.dock[data-side='right'] .chip.is-new.is-near .chip-plus {
+  right: 8px;
+  transform: translateY(-50%) rotate(90deg);
+}
+
+.dock[data-side='left'] .chip.is-new.is-near .chip-plus {
+  left: 8px;
+  transform: translateY(-50%) rotate(90deg);
 }
 
 .chip.is-new.is-near .chip-plus {
   color: #fff;
-  transform: rotate(90deg);
 }
 
 /* ------------------------------------------------------- a nota que flutua */
@@ -2337,5 +2361,10 @@ html[data-window='peek'] body {
   .peek-card {
     animation: none;
     transition: none;
+  }
+
+  /* With nothing moving, a tab has to be at its full width to be findable. */
+  .chip-face {
+    width: 30px;
   }
 }

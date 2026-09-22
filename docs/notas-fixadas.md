@@ -1,10 +1,14 @@
 # Notas fixadas na borda da tela
 
-Uma coluna de quadradinhos coloridos fica colada na borda do monitor, por cima
-de todos os outros apps, um quadradinho por nota. Não tem painel nem moldura:
-a janela é transparente, e entre um quadradinho e outro aparece o que estiver
-atrás. O mouse para em cima de um, a nota sai ao lado para você ler. Tira o
-mouse, some.
+Uma coluna de abinhas coloridas fica colada na borda do monitor, por cima de
+todos os outros apps, uma por nota. Cada uma é um retângulo arredondado cortado
+ao meio pela borda da tela: aparece a metade de dentro, redonda do lado de
+dentro e reta do lado de fora, porque do lado de fora quem desenha é o monitor.
+Elas nunca descolam da borda. O mouse chega e a abinha cresce para dentro, para
+recebê-lo, e a nota sai ao lado para você ler. Tira o mouse, some.
+
+Não tem painel nem moldura: a janela é transparente e entre uma abinha e outra
+aparece o que estiver atrás.
 
 ## Como uma nota chega lá
 
@@ -12,8 +16,8 @@ São dois caminhos, e nenhum dos dois acontece sem querer.
 
 **Fixando um arquivo que já existe.** O alfinete na barra de cima do app fixa
 o arquivo aberto, e `⌘⇧P` faz o mesmo. Na árvore de arquivos, o botão direito
-também oferece. Um segundo clique desafixa. Desafixar é sempre no app: o
-quadradinho não tem menu, porque 26 pixels não têm onde pôr um.
+também oferece. Um segundo clique desafixa. Desafixar é sempre no app: a
+abinha não tem menu, porque dezesseis pixels não têm onde pôr um.
 
 **Clicando no `+`.** O quadradinho de baixo abre uma nota nova na hora, sem
 diálogo e sem arquivo nenhum no disco. Ela é um rascunho, igual ao que o `⌘N`
@@ -21,20 +25,20 @@ já abria: aparece também como aba não salva na janela principal, e o `⌘S` d
 é que pergunta onde gravar. O nome dela é a primeira linha do que você
 escreveu, na aba e no quadradinho ao mesmo tempo.
 
-Fechar essa aba joga o texto fora, então o quadradinho vai junto. Arquivo é
+Fechar essa aba joga o texto fora, então a abinha vai junto. Arquivo é
 outra coisa: fechar a aba de um arquivo não desafixa nada, porque o arquivo
 continua no disco.
 
 ## O que acontece quando o mouse passa
 
-Parar em cima de um quadradinho abre a nota dele ao lado, para ler. Ela não
-fixa, não pede nada e não pega o teclado: é uma olhada. Tirar o mouse do
-quadradinho fecha, e **tirar para cima da própria nota fecha igual**. Se você
-quer escrever nela, clique no quadradinho e ela abre no app.
+Parar em cima de uma abinha abre a nota dela ao lado, para ler. Ela não fixa,
+não pede nada e não pega o teclado: é uma olhada. Tirar o mouse da abinha
+fecha, e **tirar para cima da própria nota fecha igual**. Se você quer escrever
+nela, clique na abinha e ela abre no app.
 
-O quadradinho de baixo, o do `+`, veste a cor que a próxima nota vai ter.
-Clicar nele escreve um rascunho novo, que vira mais um quadradinho na coluna e
-uma aba não salva na janela principal.
+A abinha de baixo, a do `+`, é vazada e veste a cor que a próxima nota vai ter.
+Clicar nela escreve um rascunho novo, que vira mais uma abinha na coluna e uma
+aba não salva na janela principal.
 
 Quem fecha a nota é a janela principal, perguntando ao sistema onde o ponteiro
 está umas dezesseis vezes por segundo. Perguntar aos painéis não funciona:
@@ -78,15 +82,16 @@ rascunhos das abas já moravam.
 
 ## Como isso funciona por dentro
 
-São três janelas do mesmo app: a janela principal, a coluna de quadradinhos e a
-nota que flutua. As duas últimas não são um segundo programa, são este aqui com
+São três janelas do mesmo app: a janela principal, a coluna de abinhas e a nota
+que flutua. As duas últimas não são um segundo programa, são este aqui com
 outro rótulo de janela, que é o que faz a nota ser desenhada pelo mesmo editor
 do app, tema incluso.
 
 As duas são transparentes e têm exatamente o tamanho do que desenham. Isso é
 regra e não enfeite: janela transparente continua sendo janela, e todo pedaço
 dela que a pessoa não vê é um pedaço de tela que engole clique calado. A coluna
-tem 40px de largura e a altura exata dos quadradinhos.
+tem 30px de largura, que é o tamanho de uma abinha aberta, e a altura exata das
+abinhas que estão nela.
 
 No macOS, janela sem fundo depende do `macOSPrivateApi`, ligado no
 `tauri.conf.json` e no `Cargo.toml`. É o que impediria este app de ser vendido
@@ -98,6 +103,6 @@ a única que escreve qualquer coisa. As outras duas informam o que o mouse fez e
 desenham o que mandarem: duas janelas com uma cópia da mesma lista cada uma,
 trocando recados, é o defeito que esse arranjo não tem.
 
-Onde cada quadradinho e cada nota vão parar na tela é conta, e a conta mora em
-`src/app/dock-layout.ts`, longe do sistema de janelas, com 21 testes que rodam
+Onde cada abinha e cada nota vão parar na tela é conta, e a conta mora em
+`src/app/dock-layout.ts`, longe do sistema de janelas, com 22 testes que rodam
 sem uma tela por perto.
