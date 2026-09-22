@@ -2222,26 +2222,44 @@ html[data-window='dock'] .chip {
  * travels with the tab as the tab grows instead of standing still while the
  * colour slides out from under it.
  */
-/*
- * Drawn the way every icon in this app is drawn: a 1.5px stroke and no fill.
- *
- * The stroke is the colour of the background and not white, because the faces
- * change lightness with the theme: the tones are pale on a dark background and
- * deep on a light one, so one fixed ink would read on one theme and disappear
- * on the other. Taking the colour from behind the window makes the mark read
- * as a hole punched through the tab, which contrasts on both by construction.
- */
-.chip-mark {
-  width: 8px;
-  height: 8px;
-  border: 1.5px solid color-mix(in oklab, var(--bg-app) 80%, transparent);
-  border-radius: 999px;
-  opacity: 0;
-  transition: opacity 160ms var(--spring);
+.chip:focus-visible {
+  outline: none;
 }
 
-.chip.is-dirty .chip-mark {
-  opacity: 1;
+.chip:focus-visible .chip-face {
+  width: 30px;
+  box-shadow:
+    0 0 0 2px var(--bg-app),
+    0 0 0 4px var(--pin);
+}
+
+/*
+ * A note with something unwritten in it wears a dot. It sits in the middle of
+ * the face rather than at a fixed distance from the edge of the window, so it
+ * travels with the tab as the tab grows instead of standing still while the
+ * colour slides out from under it.
+ */
+/*
+ * A note with something unwritten in it is a full round on the inside.
+ *
+ * Not a mark, and not a size. Sixteen pixels of colour is not a surface you
+ * put a symbol on, and every ink tried there had the same problem: the six
+ * colours are pale on a dark background and deep on a light one, so what reads
+ * on one theme disappears on the other. Sticking out further was worse still,
+ * because a tab that is permanently half open looks broken rather than full.
+ *
+ * The silhouette has none of that. The tab keeps its place, its size and its
+ * colour, and only its shape says something: square-cornered inside is settled,
+ * fully round is not. A pill and a rounded rectangle are told apart at a glance
+ * on any background and in any theme, because the difference is the outline and
+ * not the ink.
+ */
+.chip.is-dirty .chip-face {
+  border-radius: 15px 0 0 15px;
+}
+
+.dock[data-side='left'] .chip.is-dirty .chip-face {
+  border-radius: 0 15px 15px 0;
 }
 
 /* ---- the tab that writes a new note */
@@ -2583,7 +2601,6 @@ html[data-window='dock'] .chip {
 @media (prefers-reduced-motion: reduce) {
   .chip,
   .chip-face,
-  .chip-mark,
   .chip-plus,
   .peek-card {
     animation: none;
@@ -2649,4 +2666,75 @@ html[data-window='dock'] .chip {
 
 .opacity-preview-line.is-short {
   width: 62%;
+}
+
+/* ------------------------------------------------ perguntar antes de fechar */
+
+/*
+ * Closing from the tab's own menu, out on the edge of the screen, asks first.
+ * Whoever pressed it is looking at thirty pixels of colour and not at the
+ * note: they cannot see what they are about to lose.
+ */
+.peek-ask {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--bg-content) 92%, transparent);
+  backdrop-filter: blur(8px);
+  animation: peek-in 140ms var(--spring) backwards;
+}
+
+.peek-ask-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 560;
+  font-size: 0.8125rem;
+}
+
+.peek-ask-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  justify-content: center;
+}
+
+.peek-ask-row button {
+  height: 1.875rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background-color var(--ease),
+    color var(--ease);
+}
+
+.peek-ask-row button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.peek-ask-row button.is-quiet:hover {
+  color: var(--tone-red);
+}
+
+.peek-ask-row button.is-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-on);
+}
+
+.peek-ask-row button.is-primary:hover {
+  background: var(--accent-hover);
+  color: var(--accent-on);
 }

@@ -37,7 +37,9 @@ import {
 import { noteTitle } from '~/app/drafts'
 import {
   hidePanel,
+  onChipMenuChoice,
   onChipUnderPointer,
+  openChipMenu,
   placePanel,
   preparePanel,
   showMainWindow,
@@ -67,8 +69,6 @@ export interface DockOptions {
   /** How solid a floating note is, from the settings. */
   opacity: number
   readOnly: boolean
-  /** Ids the app itself has unsaved changes in. */
-  dirty: readonly string[]
   /** The text of a pinned note that is still only a draft. */
   draftText: (id: string) => string | undefined
   /** A draft edited in the note that was kept open. */
@@ -83,8 +83,8 @@ export function useDock(options: DockOptions) {
   const [pins, setPins] = useState<Pin[]>(loadPins)
   /** The note somebody clicked, which is open until they close it. */
   const [kept, setKept] = useState<string | null>(null)
-  /** What the kept note says it still has unwritten. */
-  const [keptDirty, setKeptDirty] = useState<readonly string[]>([])
+  /** Which tab the system's menu was opened over. */
+  const menuTarget = useRef<string | null>(null)
 
   // Read from the message handlers, which are bound once and must see the
   // state of the moment the message arrived.
@@ -93,7 +93,6 @@ export function useDock(options: DockOptions) {
     pins,
     side: options.side,
     theme: options.theme,
-    dirty: [],
     nextColor: freeColor(pins),
   })
 
@@ -212,10 +211,9 @@ export function useDock(options: DockOptions) {
       pins,
       side: options.side,
       theme: options.theme,
-      dirty: [...new Set([...options.dirty, ...keptDirty])],
       nextColor: freeColor(pins),
     }),
-    [pins, options.side, options.theme, options.dirty, keptDirty],
+    [pins, options.side, options.theme],
   )
 
   useEffect(() => {
@@ -299,6 +297,24 @@ export function useDock(options: DockOptions) {
 
   useEffect(() => () => window.clearTimeout(settling.current), [])
 
+  /** What was chosen in the system's menu, which named a line and nothing else. */
+  useEffect(() => {
+    if (!options.enabled) return
+    return onChipMenuChoice((id) => {
+      const target = menuTarget.current
+      if (!target) return
+      if (id === 'chip:unpin') {
+        forgetRef.current(target)
+        return
+      }
+      // The note is the one that knows whether it has anything unwritten, and
+      // the only one that can ask about it, so it is asked.
+      if (latest.current.kept !== target) return
+      if (id === 'chip:save') send('note:save', null)
+      if (id === 'chip:close') send('note:ask-close', null)
+    })
+  }, [options.enabled])
+
   // One listener per message, bound once. They read through `latest` rather
   // than closing over the state, so none of them is rebound as things change.
   useEffect(() => {
@@ -312,6 +328,16 @@ export function useDock(options: DockOptions) {
       }),
 
       on('dock:click', ({ index }) => void keepNote(index)),
+
+      on('dock:menu', ({ index }) => {
+        const pin = latest.current.pins[index]
+        if (!pin) return
+        // Remembered here rather than sent to the system and back: the menu
+        // only has to say which line was chosen, and this is the one window
+        // that knows what it was chosen about.
+        menuTarget.current = pin.id
+        void openChipMenu(latest.current.kept === pin.id)
+      }),
 
       on('dock:new', () => {
         const target = latest.current.options.onNewNote()
@@ -330,12 +356,6 @@ export function useDock(options: DockOptions) {
         // same note, and the text in it is the same text.
         const pin = findPin(latest.current.pins, id)
         if (pin) send('note:show', describe({ ...pin, color }))
-      }),
-
-      on('note:dirty', ({ id, dirty }) => {
-        setKeptDirty((current) =>
-          dirty ? [...new Set([...current, id])] : current.filter((held) => held !== id),
-        )
       }),
 
       on('note:draft', ({ id, text }) => {

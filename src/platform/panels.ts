@@ -149,3 +149,41 @@ export async function quitApp(): Promise<void> {
   if (!isDesktop()) return
   await invoke('quit_app')
 }
+
+/**
+ * Opens the system's own menu over a tab.
+ *
+ * The system's, and not one drawn inside the window, because the column is
+ * thirty pixels wide: anything the interface draws past its own edge is cut
+ * off by the system, and three lines of menu have nowhere to go in there.
+ */
+export async function openChipMenu(open: boolean): Promise<void> {
+  if (!isDesktop()) return
+  try {
+    await invoke('chip_menu', { open })
+  } catch {
+    // No menu on this platform is a tab that answers to clicks only.
+  }
+}
+
+/** Which line of that menu was chosen, as its id. */
+export function onChipMenuChoice(handle: (id: string) => void): () => void {
+  if (!isDesktop()) return () => {}
+  let stop: (() => void) | null = null
+  let cancelled = false
+
+  void import('@tauri-apps/api/event')
+    .then(({ listen }) => listen<string>('chip:chose', (event) => handle(event.payload)))
+    .then((off) => {
+      if (cancelled) off()
+      else stop = off
+    })
+    .catch(() => {
+      // Without the listener the menu simply does nothing when chosen.
+    })
+
+  return () => {
+    cancelled = true
+    stop?.()
+  }
+}

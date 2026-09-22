@@ -36,11 +36,25 @@ Parar em cima de uma abinha abre a nota dela ao lado, para ler. Ela não fixa,
 não pede nada e não pega o teclado: é uma olhada. Tirar o mouse da abinha
 fecha, e **tirar para cima da própria nota fecha igual**.
 
+**O botão direito na abinha abre um menu** com salvar a nota, fechar a nota e
+tirar ela da borda. É o menu do sistema e não um desenhado na janela, porque a
+coluna tem trinta pixels de largura e o que a interface desenha para fora da
+própria janela o sistema corta.
+
 **Clicar na abinha guarda a nota.** Ela sai um passo para dentro, vira uma
 janela sua e não sai mais: não fecha quando o mouse vai embora, não fecha
 quando você clica em outro programa. Arrasta pela barra de cima, redimensiona
 pelo canto, e fecha no `×` ou no `Esc`. O alfinete cortado, ao lado do `×`,
-tira a nota da borda da tela e fecha a janela junto. Enquanto ela está lá, passar o mouse
+tira a nota da borda da tela e fecha a janela junto.
+
+A bolinha colorida na ponta esquerda da barra abre as seis cores. Trocar a cor
+troca também a da abinha e a da aba no app, porque é a mesma nota.
+
+Fechar com algo não escrito pergunta antes. As abinhas não carregam marca
+nenhuma de "não salvo", de propósito: dezesseis pixels de cor não são
+superfície para pôr símbolo, e toda tinta testada ali sumia num dos dois temas.
+Então quem avisa é a própria nota, no único momento em que isso importa, que é
+o momento em que o texto seria jogado fora. Enquanto ela está lá, passar o mouse
 nas outras abinhas continua abrindo as olhadas normalmente.
 
 Dentro da nota guardada dá para escrever. Ela grava sozinha depois de uma pausa

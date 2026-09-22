@@ -49,6 +49,8 @@ export function Note() {
   const [picking, setPicking] = useState(false)
   /** Whether this window has the keyboard, which is what "being written in" is. */
   const [writing, setWriting] = useState(false)
+  /** Raised when closing would throw away text, so the person is asked first. */
+  const [asking, setAsking] = useState(false)
 
   useEffect(() => {
     const stops = [
@@ -244,27 +246,51 @@ export function Note() {
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
-  useEffect(() => {
-    if (id) send('note:dirty', { id, dirty })
-  }, [id, dirty])
-
+  /** Puts the note away. Whatever had to be asked has been asked by now. */
   const close = useCallback(() => {
     window.clearTimeout(timer.current)
-    if (pin && !isDraftPin(pin) && dirty) void save()
+    setAsking(false)
     send('note:closed', null)
     void hidePanel('note')
-  }, [dirty, pin, save])
+  }, [])
+
+  /**
+   * Closing asks first when there is something unwritten.
+   *
+   * The tabs on the edge of the screen carry no mark of their own, by choice:
+   * sixteen pixels of colour is not a surface to put a symbol on. So this is
+   * the one place that says there is unsaved text, and it says it at the only
+   * moment it matters, which is the moment it would be thrown away.
+   */
+  const askClose = useCallback(() => {
+    if (dirty && pin && !isDraftPin(pin)) setAsking(true)
+    else close()
+  }, [close, dirty, pin])
+
+  useEffect(() => {
+    const stops = [
+      on('note:save', () => {
+        window.clearTimeout(timer.current)
+        void save()
+      }),
+      on('note:ask-close', askClose),
+    ]
+    return () => {
+      for (const stop of stops) stop()
+    }
+  }, [askClose, save])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
-      // The colours are the nearer thing to dismiss, so they go first.
-      if (picking) setPicking(false)
-      else close()
+      // The nearest thing to dismiss goes first.
+      if (asking) setAsking(false)
+      else if (picking) setPicking(false)
+      else askClose()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [close, picking])
+  }, [asking, askClose, picking])
 
   if (!note || !pin) return <div className="peek is-blank" />
 
@@ -326,11 +352,42 @@ export function Note() {
             className="icon-button is-small"
             aria-label="Fechar a nota"
             title="Fechar"
-            onClick={close}
+            onClick={askClose}
           >
             <CloseIcon size={13} />
           </button>
         </header>
+
+        {asking && (
+          <div className="peek-ask" role="alertdialog">
+            <p className="peek-ask-text">Salvar antes de fechar?</p>
+            <div className="peek-ask-row">
+              <button type="button" onClick={() => setAsking(false)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="is-quiet"
+                onClick={() => {
+                  setAsking(false)
+                  send('note:closed', null)
+                  void hidePanel('note')
+                }}
+              >
+                Fechar sem salvar
+              </button>
+              <button
+                type="button"
+                className="is-primary"
+                onClick={() => {
+                  void save().then(close)
+                }}
+              >
+                Salvar e fechar
+              </button>
+            </div>
+          </div>
+        )}
 
         {picking && (
           <>

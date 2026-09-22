@@ -1,3 +1,4 @@
+mod chipmenu;
 mod panels;
 mod pointer;
 mod tray;
@@ -149,6 +150,7 @@ pub fn run() {
         .manage(Opened::default())
         .manage(panels::Scale::default())
         .manage(pointer::Watch::default())
+        .on_menu_event(|app, event| chipmenu::on_chosen(app, event.id().as_ref()))
         .invoke_handler(tauri::generate_handler![
             allow_base,
             move_to_trash,
@@ -160,6 +162,7 @@ pub fn run() {
             panels::panel_prepare,
             panels::cursor_at,
             pointer::watch_chips,
+            chipmenu::chip_menu,
             panels::panel_hide,
             panels::panel_is_open,
             panels::show_main,

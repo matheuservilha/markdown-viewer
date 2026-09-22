@@ -117,11 +117,30 @@ pub async fn panel_place(
     // given already accounts for the new size.
     window.set_size(size).map_err(stringify)?;
     window.set_position(position).map_err(stringify)?;
-    window.show().map_err(stringify)?;
-    // Being on top is set again on every placement because a window that was
-    // hidden and shown again can come back behind whatever took the screen in
-    // the meantime.
-    window.set_always_on_top(true).map_err(stringify)?;
+
+    // Shown and raised only when it was not already showing.
+    //
+    // Putting a window on screen makes the system work out the cursor again
+    // from scratch, and it works it out for the window it just put up rather
+    // than for the one the pointer is actually over. The pointer is over a
+    // tab, so the hand the tab asked for was being thrown away every time the
+    // note beside it appeared. Moving a window that is already up does not do
+    // that, which is why running the pointer down the column was fine and
+    // arriving at the first tab was not.
+    if !window.is_visible().unwrap_or(false) {
+        window.show().map_err(stringify)?;
+        window.set_always_on_top(true).map_err(stringify)?;
+
+        // And say the cursor again, because putting a window up is exactly
+        // what made the system forget it. The pointer is on a tab whenever a
+        // note is being put up beside one: that is the only reason this
+        // happens at all.
+        if label == PEEK {
+            if let Some(column) = app.get_webview_window(DOCK) {
+                let _ = column.set_cursor_icon(tauri::CursorIcon::Hand);
+            }
+        }
+    }
     if focus {
         window.set_focus().map_err(stringify)?;
     }

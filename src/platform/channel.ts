@@ -26,9 +26,7 @@ export interface DockState {
   pins: Pin[]
   side: Side
   theme: 'light' | 'dark'
-  /** Ids of the notes with something unsaved in them, so the corner can show. */
-  dirty: string[]
-  /** The colour the next note will be born with, worn by the square that adds one. */
+  /** The colour the next note will be born with, worn by the tab that adds one. */
   nextColor: PinColor
 }
 
@@ -61,6 +59,8 @@ export interface Messages {
   'dock:near': { index: number }
   /** A tab was clicked: its note stops being a glance and stays open. */
   'dock:click': { index: number }
+  /** The right button was pressed on a tab, which asks for its menu. */
+  'dock:menu': { index: number }
   /** The tab that writes a new note was clicked. */
   'dock:new': null
 
@@ -76,8 +76,10 @@ export interface Messages {
   'note:recolour': { id: string; color: PinColor }
   /** A draft edited in the kept note; the app's window stores it. */
   'note:draft': { id: string; text: string }
-  /** Something unwritten in the kept note, so its tab can show a dot. */
-  'note:dirty': { id: string; dirty: boolean }
+  /** Write what is unwritten, asked for from outside the note. */
+  'note:save': null
+  /** Put the note away, asking first if there is anything unwritten in it. */
+  'note:ask-close': null
 
   /**
    * The look of the panels changed while they were open, which is how a slider

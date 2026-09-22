@@ -348,25 +348,12 @@ export function App() {
     [],
   )
 
-  /**
-   * Which documents have something unwritten in them, as one string so that
-   * the list handed to the dock keeps its identity between keystrokes. Without
-   * this the dock is sent a fresh copy of itself on every letter typed.
-   */
-  const dirtyKey = Object.entries(state.docs)
-    .filter(([, doc]) => doc.dirty)
-    .map(([id]) => id)
-    .toSorted()
-    .join('\n')
-  const dirtyIds = useMemo(() => (dirtyKey === '' ? [] : dirtyKey.split('\n')), [dirtyKey])
-
   const dock = useDock({
     enabled: settings.dock,
     side: settings.dockSide,
     theme,
     opacity: settings.noteOpacity,
     readOnly: settings.readOnly,
-    dirty: dirtyIds,
 
     draftText: useCallback((pinId: string) => latestState.current.docs[pinId]?.text, []),
 

@@ -20,7 +20,6 @@ const EMPTY: DockState = {
   pins: [],
   side: 'right',
   theme: 'dark',
-  dirty: [],
   nextColor: 'ambar',
 }
 
@@ -59,21 +58,19 @@ export function Dock() {
           <button
             key={pin.id}
             type="button"
-            className={
-              'chip' +
-              (near === index ? ' is-near' : '') +
-              (state.dirty.includes(pin.id) ? ' is-dirty' : '')
-            }
+            className={'chip' + (near === index ? ' is-near' : '')}
             data-color={pin.color}
             // Each square comes in a beat after the one above it, so a column
             // that just gained a note reads as growing rather than blinking.
             style={{ animationDelay: index * 45 + 'ms' }}
             aria-label={pinTitle(pin)}
             onClick={() => send('dock:click', { index })}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              send('dock:menu', { index })
+            }}
           >
-            <span className="chip-face">
-              <span className="chip-mark" aria-hidden="true" />
-            </span>
+            <span className="chip-face" />
           </button>
         ))}
 
