@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { EDITOR_BINDINGS, SHORTCUTS, editorCap, keyCap, onApple } from './shortcuts'
 import { FONT_LABELS, LIMITS, type BodyFont, type Settings, type ThemeMode } from '~/app/settings'
-import { CloseIcon, GripIcon } from './icons'
+import { ChevronIcon, CloseIcon, GripIcon } from './icons'
 
 const POSITION_KEY = 'markdown-viewer.settings.position'
 
@@ -35,6 +35,7 @@ interface Props {
 export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocus }: Props) {
   const panel = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<Position | null>(loadPosition)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -216,9 +217,20 @@ export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocu
         </button>
 
         <div className="settings-divider" />
-        <p className="section-label">Atalhos</p>
+        {/* Closed to begin with: twenty six lines of reference that most
+            visits to this window are not here for, and that would otherwise
+            bury the settings above them. */}
+        <button
+          type="button"
+          className="section-label section-toggle"
+          aria-expanded={shortcutsOpen}
+          onClick={() => setShortcutsOpen((open) => !open)}
+        >
+          <ChevronIcon size={12} className={'tree-twisty' + (shortcutsOpen ? ' is-open' : '')} />
+          Atalhos
+        </button>
 
-        <div className="shortcut-list">
+        <div className="shortcut-list" hidden={!shortcutsOpen}>
           {SHORTCUTS.map((shortcut) => (
             <div key={shortcut.id} className="shortcut-row">
               <span className="settings-label">{shortcut.label}</span>

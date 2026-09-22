@@ -23,6 +23,8 @@ export interface Settings {
   uiScale: number
   /** Width of the file tree, in px. Dragged, not typed. */
   sidebarWidth: number
+  /** Width of the outline and links panel, in px. Dragged, not typed. */
+  infoWidth: number
   /** Whether the outline and links panel is showing. */
   infoPanel: boolean
   /** Whether the history at the foot of the sidebar is open. */
@@ -42,6 +44,7 @@ export const DEFAULTS: Settings = {
   bodyFont: 'sans',
   uiScale: 1.12,
   sidebarWidth: 216,
+  infoWidth: 240,
   infoPanel: false,
   recentsOpen: false,
   showAllFiles: false,
@@ -59,6 +62,7 @@ export const LIMITS = {
   lineHeight: { min: 1.3, max: 2.2, step: 0.05 },
   uiScale: { min: 0.9, max: 1.35, step: 0.05 },
   sidebarWidth: { min: 170, max: 620, step: 1 },
+  infoWidth: { min: 180, max: 520, step: 1 },
 } as const
 
 const FONT_STACKS: Record<BodyFont, string> = {
@@ -92,6 +96,7 @@ function apply(settings: Settings): void {
   root.setProperty('--measure', settings.measurePx + 'px')
   root.setProperty('--ui-scale', String(settings.uiScale))
   root.setProperty('--sidebar-width', settings.sidebarWidth + 'px')
+  root.setProperty('--info-width', settings.infoWidth + 'px')
   root.setProperty('--font-size', settings.fontSize + 'px')
   root.setProperty('--line-height', String(settings.lineHeight))
   root.setProperty('--font-body', FONT_STACKS[settings.bodyFont])

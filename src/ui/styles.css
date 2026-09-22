@@ -395,19 +395,24 @@ a:focus-visible,
   gap: 0.25rem;
 }
 
+/*
+ * Three of these sit at the top of the sidebar now, where there used to be
+ * two, so each one gives back a little of its height and inset. They are the
+ * way in, not the work, and the tree below is what the panel is for.
+ */
 .nav-action {
   display: flex;
-  gap: 0.625rem;
+  gap: 0.5rem;
   align-items: center;
   width: 100%;
-  height: 2.125rem;
-  padding: 0 0.625rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--surface-2);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.78125rem;
+  font-size: 0.75rem;
   text-align: left;
   cursor: pointer;
   transition:
@@ -828,6 +833,11 @@ a:focus-visible,
   flex: 1;
   min-width: 0;
   overflow-x: auto;
+
+  /* Without this the strip grows a vertical scrollbar it has no use for. CSS
+     turns `visible` into `auto` on the other axis as soon as one axis
+     scrolls, and the strip is exactly one tab tall. */
+  overflow-y: hidden;
 }
 
 .tabs::-webkit-scrollbar {
@@ -1033,10 +1043,18 @@ a:focus-visible,
 
 /* ------------------------------------------------ outline and links */
 
+/*
+ * The outline and links panel. Its width is the one the person dragged, and
+ * `min-width: 0` is what keeps it there: without it a flex item is at least as
+ * wide as its own content, so a long file path under Links pushed the panel
+ * out and switching back to Sumário pulled it in again. The panel changed size
+ * because the contents did, which is the one thing a panel must not do.
+ */
 .info {
   display: flex;
-  flex: 0 0 15rem;
+  flex: 0 0 var(--info-width);
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   border-left: 1px solid var(--border-subtle);
 }
@@ -1886,4 +1904,79 @@ a:focus-visible,
   color: var(--text-disabled);
   font-variant-numeric: tabular-nums;
   opacity: 0.7;
+}
+
+/*
+ * Taking one entry out of the history.
+ *
+ * The row itself stays a single button, so the whole width still opens the
+ * file. The cross rides on top of its right end and only shows when the
+ * pointer is on that row, or when it has the keyboard, which keeps a list
+ * meant for glancing at from filling with controls.
+ */
+.recents-item {
+  position: relative;
+}
+
+.recents-forget {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-disabled);
+  opacity: 0;
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition:
+    opacity var(--ease),
+    background-color var(--ease),
+    color var(--ease);
+}
+
+.recents-item:hover .recents-forget,
+.recents-forget:focus-visible {
+  opacity: 1;
+}
+
+.recents-forget:hover {
+  background: var(--surface-3, var(--surface-2));
+  color: var(--text-primary);
+}
+
+/* The name stops before the cross, so the two never sit on top of each other. */
+.recents-item:hover .tree-name {
+  padding-right: 1.25rem;
+}
+
+/*
+ * A section heading that opens and closes what is under it. It keeps the look
+ * of the headings beside it and only adds the twisty, so the screen does not
+ * gain a second kind of title.
+ */
+.section-toggle {
+  display: flex;
+  gap: 0.3125rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.125rem 0.75rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.section-toggle:hover {
+  color: var(--text-secondary);
 }
