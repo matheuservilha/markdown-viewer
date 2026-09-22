@@ -2017,7 +2017,9 @@ a:focus-visible,
 html[data-window='dock'],
 html[data-window='dock'] body,
 html[data-window='peek'],
-html[data-window='peek'] body {
+html[data-window='peek'] body,
+html[data-window='note'],
+html[data-window='note'] body {
   background: transparent;
 }
 
@@ -2242,8 +2244,15 @@ html[data-window='dock'] .chip {
 
 /*
  * The card is the window's only child and carries everything the window used
- * to: the corners, the edge and the shadow. It comes in from the side its
- * square is on, so it reads as coming out of that square.
+ * to: the corners, the edge and the shadow. It comes in from the side its tab
+ * is on, so it reads as coming out of that tab.
+ *
+ * It is slightly see-through, because a note that floats over the work it is
+ * about should let a little of that work show. The blur behind it is what
+ * keeps the text readable over something busy: without it, a paragraph over a
+ * photograph is a paragraph nobody reads. It is a small window over a mostly
+ * still desktop, which is the one case where the cost of blurring is worth
+ * paying.
  */
 .peek-card {
   display: flex;
@@ -2253,11 +2262,16 @@ html[data-window='dock'] .chip {
   overflow: hidden;
   border: 1px solid var(--border-emphasis);
   border-radius: 14px;
-  background: var(--bg-content);
+  background: color-mix(
+    in srgb,
+    var(--bg-content) calc(var(--note-opacity, 1) * 100%),
+    transparent
+  );
   box-shadow:
     0 2px 6px rgb(0 0 0 / 22%),
     0 18px 44px rgb(0 0 0 / 34%);
   animation: peek-in 170ms var(--spring) backwards;
+  backdrop-filter: blur(14px) saturate(1.3);
 
   /* The reading column is the window: there is no room here for the width the
      app's editor uses, and centring inside 392px is not a column anyway. */
@@ -2277,9 +2291,44 @@ html[data-window='dock'] .chip {
   gap: 0.4375rem;
   align-items: center;
   height: 2.125rem;
-  padding: 0 0.75rem;
+  padding: 0 0.3125rem 0 0.75rem;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) calc(var(--note-opacity, 1) * 100%), transparent);
+}
+
+/*
+ * The kept note has no title bar of its own, so its header is one: the whole
+ * strip drags the window, apart from the buttons at the end of it.
+ */
+.peek.is-kept .peek-head {
+  height: 2.375rem;
+  padding-left: 0.5rem;
+  cursor: default;
+}
+
+/* Two short rules that say "this is the part you hold", which is the one thing
+   a window with no title bar has no other way of saying. */
+.peek-grip {
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.875rem;
+  border-right: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
+  opacity: 0.55;
+}
+
+.peek.is-kept .peek-card {
+  animation-name: keep-in;
+}
+
+/* A note that was clicked comes forward rather than sliding in from the side:
+   it was already on screen as a glance, and this is the same note stepping
+   out of the column. */
+@keyframes keep-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .peek-colour {
@@ -2374,4 +2423,59 @@ html[data-window='dock'] .chip {
   .chip-face {
     width: 30px;
   }
+}
+
+/* ------------------------------------------------ prévia da opacidade */
+
+/*
+ * A card of the right shape over a background busy enough to show what is
+ * getting through. The note itself does change while the slider moves, but
+ * only when a note happens to be open, and choosing a number you cannot see
+ * is choosing at random.
+ */
+.opacity-preview {
+  display: flex;
+  align-items: center;
+  height: 3.25rem;
+  margin: 0.125rem 0 0.25rem;
+  padding: 0 0.625rem;
+  border-radius: var(--radius-sm);
+  background-image: linear-gradient(
+    135deg,
+    var(--tone-purple) 0%,
+    var(--tone-blue) 45%,
+    var(--tone-teal) 100%
+  );
+}
+
+.opacity-preview-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+  justify-content: center;
+  height: 2.375rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-sm);
+  background: var(--bg-content);
+}
+
+.opacity-preview-bar {
+  width: 2.75rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.opacity-preview-line {
+  width: 100%;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+  opacity: 0.55;
+}
+
+.opacity-preview-line.is-short {
+  width: 62%;
 }

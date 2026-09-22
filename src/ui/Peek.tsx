@@ -45,19 +45,29 @@ export function Peek() {
   // The app's window is the one that knows what to show here, and it may have
   // been told before this window finished loading.
   useEffect(() => {
-    const stop = on('peek:note', (next) => {
-      // The settings live in shared storage, so they are read again with every
-      // note rather than kept: the app may have changed the reading width or
-      // the font while this panel sat closed.
-      applySettings(loadSettings())
-      setNote(next)
-    })
+    const stops = [
+      on('peek:note', (next) => {
+        // The settings live in shared storage, so they are read again with
+        // every note rather than kept: the app may have changed the reading
+        // width or the font while this panel sat closed.
+        applySettings(loadSettings())
+        setNote(next)
+      }),
+      on('panels:look', ({ theme, opacity }) => {
+        document.documentElement.dataset.theme = theme
+        document.documentElement.style.setProperty('--note-opacity', String(opacity))
+      }),
+    ]
     send('panel:hello', { role: 'peek' })
-    return stop
+    return () => {
+      for (const stop of stops) stop()
+    }
   }, [])
 
   useEffect(() => {
-    if (note) document.documentElement.dataset.theme = note.theme
+    if (!note) return
+    document.documentElement.dataset.theme = note.theme
+    document.documentElement.style.setProperty('--note-opacity', String(note.opacity))
   }, [note])
 
   const pin = note?.pin ?? null

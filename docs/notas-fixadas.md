@@ -33,8 +33,19 @@ continua no disco.
 
 Parar em cima de uma abinha abre a nota dela ao lado, para ler. Ela não fixa,
 não pede nada e não pega o teclado: é uma olhada. Tirar o mouse da abinha
-fecha, e **tirar para cima da própria nota fecha igual**. Se você quer escrever
-nela, clique na abinha e ela abre no app.
+fecha, e **tirar para cima da própria nota fecha igual**.
+
+**Clicar na abinha guarda a nota.** Ela sai um passo para dentro, vira uma
+janela sua e não sai mais: não fecha quando o mouse vai embora, não fecha
+quando você clica em outro programa. Arrasta pela barra de cima, redimensiona
+pelo canto, e fecha no `×` ou no `Esc`. Enquanto ela está lá, passar o mouse
+nas outras abinhas continua abrindo as olhadas normalmente.
+
+Dentro da nota guardada dá para escrever. Ela grava sozinha depois de uma pausa
+na digitação, **mesmo com "Salvar sozinho" desligado nos ajustes**: aqui não
+existe aba nem pergunta na hora de fechar, e o texto seria a única cópia. Se o
+arquivo mudou por fora enquanto você escrevia, ela não sobrescreve: aparece uma
+tarja com "Recarregar" e "Salvar mesmo assim".
 
 A abinha de baixo, a do `+`, é vazada e veste a cor que a próxima nota vai ter.
 Clicar nela escreve um rascunho novo, que vira mais uma abinha na coluna e uma
@@ -96,8 +107,8 @@ rascunhos das abas já moravam.
 
 ## Como isso funciona por dentro
 
-São três janelas do mesmo app: a janela principal, a coluna de abinhas e a nota
-que flutua. As duas últimas não são um segundo programa, são este aqui com
+São quatro janelas do mesmo app: a janela principal, a coluna de abinhas, a
+olhada que vai e vem com o mouse e a nota guardada. As duas últimas não são um segundo programa, são este aqui com
 outro rótulo de janela, que é o que faz a nota ser desenhada pelo mesmo editor
 do app, tema incluso.
 
@@ -106,6 +117,10 @@ regra e não enfeite: janela transparente continua sendo janela, e todo pedaço
 dela que a pessoa não vê é um pedaço de tela que engole clique calado. A coluna
 tem 30px de largura, que é o tamanho de uma abinha aberta, e a altura exata das
 abinhas que estão nela.
+
+A nota guardada é a exceção que confirma a regra: ela é uma janela que a pessoa
+move e redimensiona, então o tamanho dela é o que ela escolheu, e cada pixel
+dela é visível.
 
 No macOS, janela sem fundo depende do `macOSPrivateApi`, ligado no
 `tauri.conf.json` e no `Cargo.toml`. É o que impediria este app de ser vendido

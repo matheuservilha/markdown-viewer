@@ -204,6 +204,25 @@ export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocu
           onChange={(value) => update('dockSide', value)}
         />
 
+        <Slider
+          label="Opacidade"
+          value={settings.noteOpacity}
+          limits={LIMITS.noteOpacity}
+          format={(value) => Math.round(value * 100) + '%'}
+          onChange={(value) => update('noteOpacity', value)}
+        />
+
+        {/* The note itself changes while the slider moves, but it is only open
+            when it is open. This is the same card over the same kind of busy
+            background, here to be looked at while the number is chosen. */}
+        <div className="opacity-preview" aria-hidden="true">
+          <div className="opacity-preview-card" style={{ opacity: settings.noteOpacity }}>
+            <span className="opacity-preview-bar" />
+            <span className="opacity-preview-line" />
+            <span className="opacity-preview-line is-short" />
+          </div>
+        </div>
+
         <p className="settings-note">
           Os quadradinhos ficam por cima dos outros apps. Fechar a janela do app deixa eles lá, e o
           ícone ao lado do relógio traz o app de volta ou encerra tudo.

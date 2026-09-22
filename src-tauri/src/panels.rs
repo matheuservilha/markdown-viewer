@@ -25,7 +25,14 @@ pub struct Scale(Mutex<Option<f64>>);
 
 pub const MAIN: &str = "main";
 pub const DOCK: &str = "dock";
+/// The note that floats out while the pointer rests on a tab.
+///
+/// Named here rather than used here: the labels come over from the interface,
+/// which is what decides when each window is wanted.
+#[allow(dead_code)]
 pub const PEEK: &str = "peek";
+/// The note somebody clicked, which stays until it is closed.
+pub const NOTE: &str = "note";
 
 /// The usable part of a screen, in the CSS pixels of that screen.
 ///
@@ -192,10 +199,13 @@ pub fn quit_app(app: tauri::AppHandle) {
 }
 
 fn build(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
-    let peek = label == PEEK;
+    // The note somebody clicked is a window they own: it can be moved, it can
+    // be resized, and nothing takes it away. The other two are panels, which
+    // appear and go on their own and are never sized by hand.
+    let kept = label == NOTE;
 
     WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
-        .title(if peek { "Nota" } else { "Notas fixadas" })
+        .title(if label == DOCK { "Notas fixadas" } else { "Nota" })
         // No title bar, because a panel the width of a scrollbar has nowhere
         // to put one. The interface draws what little furniture it needs.
         .decorations(false)
@@ -210,7 +220,7 @@ fn build(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
         .visible_on_all_workspaces(true)
         // A panel is not a window somebody alt-tabs to.
         .skip_taskbar(true)
-        .resizable(peek)
+        .resizable(kept)
         .minimizable(false)
         .maximizable(false)
         // The first click acts on what it landed on instead of being spent

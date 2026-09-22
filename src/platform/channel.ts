@@ -32,17 +32,20 @@ export interface DockState {
   nextColor: PinColor
 }
 
-/** A note handed to the floating window, ready to show. */
+/** A note handed to one of the floating windows, ready to show. */
 export interface PeekNote {
   pin: Pin
   /** The text, for a draft. A file is read from disk by the panel itself. */
   draftText?: string
   theme: 'light' | 'dark'
+  /** How solid the card is, so a slider being dragged shows up at once. */
+  opacity: number
+  readOnly: boolean
 }
 
 export interface Messages {
   /** A panel has just loaded and has nothing to show yet. */
-  'panel:hello': { role: 'dock' | 'peek' }
+  'panel:hello': { role: 'dock' | 'peek' | 'note' }
 
   'dock:state': DockState
 
@@ -56,10 +59,27 @@ export interface Messages {
    * app's window has the system watch the pointer, and says what it saw.
    */
   'dock:near': { index: number }
+  /** A tab was clicked: its note stops being a glance and stays open. */
+  'dock:click': { index: number }
   /** The tab that writes a new note was clicked. */
   'dock:new': null
 
+  /** The glance that comes and goes with the pointer. */
   'peek:note': PeekNote | null
+  /** The note somebody clicked, which stays until they close it. */
+  'note:show': PeekNote | null
+  /** Closed from its own corner, so the app's window stops counting it open. */
+  'note:closed': null
+  /** A draft edited in the kept note; the app's window stores it. */
+  'note:draft': { id: string; text: string }
+  /** Something unwritten in the kept note, so its tab can show a dot. */
+  'note:dirty': { id: string; dirty: boolean }
+
+  /**
+   * The look of the panels changed while they were open, which is how a slider
+   * being dragged in the settings shows up on the note itself.
+   */
+  'panels:look': { theme: 'light' | 'dark'; opacity: number }
 
   /** Bring the app's window back and open this note in it. */
   'note:open-in-app': { id: string }

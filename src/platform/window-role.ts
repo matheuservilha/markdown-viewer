@@ -9,9 +9,9 @@
 
 import { isDesktop } from '.'
 
-export type WindowRole = 'main' | 'dock' | 'peek'
+export type WindowRole = 'main' | 'dock' | 'peek' | 'note'
 
-const ROLES: WindowRole[] = ['main', 'dock', 'peek']
+const ROLES: WindowRole[] = ['main', 'dock', 'peek', 'note']
 
 interface Injected {
   __TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } }

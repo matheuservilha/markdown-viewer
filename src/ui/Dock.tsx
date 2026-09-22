@@ -69,8 +69,7 @@ export function Dock() {
             // that just gained a note reads as growing rather than blinking.
             style={{ animationDelay: index * 45 + 'ms' }}
             aria-label={pinTitle(pin)}
-            title={pinTitle(pin)}
-            onClick={() => send('note:open-in-app', { id: pin.id })}
+            onClick={() => send('dock:click', { index })}
           >
             <span className="chip-face">
               <span className="chip-mark" aria-hidden="true" />
@@ -86,7 +85,6 @@ export function Dock() {
           data-color={state.nextColor}
           style={{ animationDelay: state.pins.length * 45 + 'ms' }}
           aria-label="Nova nota"
-          title="Nova nota"
           onClick={() => send('dock:new', null)}
         >
           <span className="chip-face">

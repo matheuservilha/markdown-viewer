@@ -40,6 +40,14 @@ export interface Settings {
   dock: boolean
   /** Which edge they sit on. */
   dockSide: Side
+  /**
+   * How solid a note that floats over everything else is, from 0 to 1.
+   *
+   * A note pinned open sits on top of the work it is about. Letting a little
+   * of that work through is what stops it reading as a hole punched in the
+   * screen; letting too much through is what stops it being readable.
+   */
+  noteOpacity: number
 }
 
 export const DEFAULTS: Settings = {
@@ -66,6 +74,7 @@ export const DEFAULTS: Settings = {
   // The right, because that is where the scrollbar already is and where the
   // text is not.
   dockSide: 'right',
+  noteOpacity: 0.94,
 }
 
 export const LIMITS = {
@@ -75,6 +84,10 @@ export const LIMITS = {
   uiScale: { min: 0.9, max: 1.35, step: 0.05 },
   sidebarWidth: { min: 170, max: 620, step: 1 },
   infoWidth: { min: 180, max: 520, step: 1 },
+  // Never fully see-through: a note you can read the desktop through is not a
+  // note, and below about three quarters the text starts fighting whatever is
+  // behind it.
+  noteOpacity: { min: 0.72, max: 1, step: 0.01 },
 } as const
 
 const FONT_STACKS: Record<BodyFont, string> = {
@@ -122,6 +135,7 @@ export function applySettings(settings: Settings): void {
   root.setProperty('--line-height', String(settings.lineHeight))
   root.setProperty('--font-body', FONT_STACKS[settings.bodyFont])
   root.setProperty('--font-heading', FONT_STACKS[settings.bodyFont])
+  root.setProperty('--note-opacity', String(settings.noteOpacity))
 }
 
 export function useSettings() {

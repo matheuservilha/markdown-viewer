@@ -11,7 +11,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { isDesktop } from '.'
 import type { Rect } from '~/app/dock-layout'
 
-export type PanelLabel = 'dock' | 'peek'
+export type PanelLabel = 'dock' | 'peek' | 'note'
 
 /** The usable part of the screen the app is on, in that screen's CSS pixels. */
 export interface WorkArea {

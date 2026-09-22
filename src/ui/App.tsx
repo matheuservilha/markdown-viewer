@@ -364,9 +364,22 @@ export function App() {
     enabled: settings.dock,
     side: settings.dockSide,
     theme,
+    opacity: settings.noteOpacity,
+    readOnly: settings.readOnly,
     dirty: dirtyIds,
 
     draftText: useCallback((pinId: string) => latestState.current.docs[pinId]?.text, []),
+
+    onDraftText: useCallback(
+      (pinId: string, next: string) => {
+        actions.edit(pinId, next)
+        // The tab, the note and the square on the edge of the screen show the
+        // same draft, so they answer to the same name: its own first line.
+        const tab = latestState.current.tabs.find((one: Tab) => one.id === pinId)
+        if (tab) actions.renameTab(pinId, noteTitle(next, tab.name))
+      },
+      [actions],
+    ),
 
     /**
      * The square at the foot of the column writes an ordinary draft, in an

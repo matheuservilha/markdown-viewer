@@ -55,28 +55,39 @@ import { on, send, type DockState, type PeekNote } from '~/platform/channel'
 const PEEK_DELAY = 90
 /** The note opens at this height unless the screen is too short for it. */
 const PEEK_HEIGHT = 420
+/** How far in from the glance's slot a kept note opens, so it reads as coming forward. */
+const KEEP_STEP = 34
 
 export interface DockOptions {
   /** Whether the tabs are on the edge of the screen at all. */
   enabled: boolean
   side: Side
   theme: 'light' | 'dark'
+  /** How solid a floating note is, from the settings. */
+  opacity: number
+  readOnly: boolean
   /** Ids the app itself has unsaved changes in. */
   dirty: readonly string[]
   /** The text of a pinned note that is still only a draft. */
   draftText: (id: string) => string | undefined
+  /** A draft edited in the note that was kept open. */
+  onDraftText: (id: string, text: string) => void
   /** Asked for by the tab that writes a new note. */
   onNewNote: () => PinTarget | null
-  /** Asked for by a click on a tab: bring this note into the app. */
+  /** Asked for from the kept note: bring it into the app. */
   onOpenInApp: (pin: Pin) => void
 }
 
 export function useDock(options: DockOptions) {
   const [pins, setPins] = useState<Pin[]>(loadPins)
+  /** The note somebody clicked, which is open until they close it. */
+  const [kept, setKept] = useState<string | null>(null)
+  /** What the kept note says it still has unwritten. */
+  const [keptDirty, setKeptDirty] = useState<readonly string[]>([])
 
   // Read from the message handlers, which are bound once and must see the
   // state of the moment the message arrived.
-  const latest = useRef({ pins, options })
+  const latest = useRef({ pins, options, kept })
   const latestState = useRef<DockState>({
     pins,
     side: options.side,
@@ -118,30 +129,81 @@ export function useDock(options: DockOptions) {
     await hidePanel('peek')
   }, [])
 
-  /** Opens the note beside the tab the pointer came to rest on. */
-  const showPeek = useCallback(async (index: number) => {
-    const { pins: known, options: now } = latest.current
-    const pin = known[index]
-    const screen = area.current
-    const column = dock.current
-    if (!pin || !screen || !column) return
-
-    const target = chipRect(column, index)
-    chip.current = target
-
-    const height = Math.max(PEEK_MIN_HEIGHT, Math.min(PEEK_HEIGHT, maxPeekHeight(screen)))
-    const rect = peekRect(screen, now.side, column, height, target.y + CHIP_HEIGHT / 2)
-
-    const note: PeekNote = { pin, theme: now.theme }
+  /** What a floating window needs to draw a note, glance or kept alike. */
+  const describe = useCallback((pin: Pin): PeekNote => {
+    const now = latest.current.options
+    const note: PeekNote = {
+      pin,
+      theme: now.theme,
+      opacity: now.opacity,
+      readOnly: now.readOnly,
+    }
     const text = isDraftPin(pin) ? now.draftText(pin.id) : undefined
     if (text !== undefined) note.draftText = text
-
-    // Told first, moved second. The panel starts reading the file while the
-    // window is still being put in place, so what appears has text in it
-    // instead of appearing empty and filling in a beat later.
-    send('peek:note', note)
-    await placePanel('peek', rect)
+    return note
   }, [])
+
+  /** Where a note belonging to this tab goes, and how big it is. */
+  const slotFor = useCallback((index: number) => {
+    const screen = area.current
+    const column = dock.current
+    if (!screen || !column) return null
+    const target = chipRect(column, index)
+    const height = Math.max(PEEK_MIN_HEIGHT, Math.min(PEEK_HEIGHT, maxPeekHeight(screen)))
+    const rect = peekRect(
+      screen,
+      latest.current.options.side,
+      column,
+      height,
+      target.y + CHIP_HEIGHT / 2,
+    )
+    return { chip: target, rect }
+  }, [])
+
+  /** Opens the glance beside the tab the pointer came to rest on. */
+  const showPeek = useCallback(
+    async (index: number) => {
+      const pin = latest.current.pins[index]
+      const slot = slotFor(index)
+      if (!pin || !slot) return
+      chip.current = slot.chip
+
+      // Told first, moved second. The panel starts reading the file while the
+      // window is still being put in place, so what appears has text in it
+      // instead of appearing empty and filling in a beat later.
+      send('peek:note', describe(pin))
+      await placePanel('peek', slot.rect)
+    },
+    [describe, slotFor],
+  )
+
+  /**
+   * Keeps the note the pointer was on: it stops being a glance and becomes a
+   * window of their own, which nothing takes away.
+   *
+   * It opens a step in from where the glance was rather than exactly on it, so
+   * that it reads as having come forward, and so that the next glance over
+   * another tab has its own slot back.
+   */
+  const keepNote = useCallback(
+    async (index: number) => {
+      const pin = latest.current.pins[index]
+      const slot = slotFor(index)
+      if (!pin || !slot) return
+
+      const step = latest.current.options.side === 'right' ? -KEEP_STEP : KEEP_STEP
+      setKept(pin.id)
+      send('note:show', describe(pin))
+      await hidePanel('peek')
+      chip.current = null
+      await placePanel(
+        'note',
+        { ...slot.rect, x: slot.rect.x + step, y: slot.rect.y - 14 },
+        { focus: true },
+      )
+    },
+    [describe, slotFor],
+  )
 
   // Everything the tabs draw, sent again whenever any of it changes.
   const state: DockState = useMemo(
@@ -149,15 +211,15 @@ export function useDock(options: DockOptions) {
       pins,
       side: options.side,
       theme: options.theme,
-      dirty: [...options.dirty],
+      dirty: [...new Set([...options.dirty, ...keptDirty])],
       nextColor: freeColor(pins),
     }),
-    [pins, options.side, options.theme, options.dirty],
+    [pins, options.side, options.theme, options.dirty, keptDirty],
   )
 
   useEffect(() => {
     // oxlint-disable-next-line immutability
-    latest.current = { pins, options }
+    latest.current = { pins, options, kept }
     // oxlint-disable-next-line immutability
     latestState.current = state
   })
@@ -165,6 +227,12 @@ export function useDock(options: DockOptions) {
   useEffect(() => {
     if (options.enabled) send('dock:state', state)
   }, [state, options.enabled])
+
+  // The look, on its own, so that dragging a slider in the settings changes a
+  // note that is already open while it is being dragged.
+  useEffect(() => {
+    send('panels:look', { theme: options.theme, opacity: options.opacity })
+  }, [options.theme, options.opacity])
 
   /**
    * The column exists while the setting says so, and is exactly as tall as the
@@ -191,6 +259,8 @@ export function useDock(options: DockOptions) {
       latest.current.options.onOpenInApp(pin)
       void showMainWindow()
       void closePeek()
+      setKept(null)
+      void hidePanel('note')
     },
     [closePeek],
   )
@@ -234,7 +304,13 @@ export function useDock(options: DockOptions) {
     const stops = [
       on('panel:hello', ({ role }) => {
         if (role === 'dock') send('dock:state', latestState.current)
+        if (role === 'note' && latest.current.kept) {
+          const pin = findPin(latest.current.pins, latest.current.kept)
+          if (pin) send('note:show', describe(pin))
+        }
       }),
+
+      on('dock:click', ({ index }) => void keepNote(index)),
 
       on('dock:new', () => {
         const target = latest.current.options.onNewNote()
@@ -243,13 +319,33 @@ export function useDock(options: DockOptions) {
         void closePeek()
       }),
 
+      on('note:closed', () => setKept(null)),
+
+      on('note:dirty', ({ id, dirty }) => {
+        setKeptDirty((current) =>
+          dirty ? [...new Set([...current, id])] : current.filter((held) => held !== id),
+        )
+      }),
+
+      on('note:draft', ({ id, text }) => {
+        latest.current.options.onDraftText(id, text)
+        // A note written on the edge of the screen names itself after its own
+        // first line, wherever it is being typed into.
+        setPins((current) => {
+          const pin = findPin(current, id)
+          if (!pin || !isDraftPin(pin)) return current
+          const named = noteTitle(text, pin.name)
+          return named === pin.name ? current : renamePin(current, id, named)
+        })
+      }),
+
       on('note:open-in-app', ({ id }) => openInApp(id)),
     ]
 
     return () => {
       for (const stop of stops) stop()
     }
-  }, [closePeek, openInApp])
+  }, [closePeek, describe, keepNote, openInApp])
 
   const toggle = useCallback((target: PinTarget) => {
     setPins((current) =>
@@ -274,7 +370,16 @@ export function useDock(options: DockOptions) {
     [],
   )
 
-  const forget = useCallback((id: string) => setPins((current) => removePin(current, id)), [])
+  const forget = useCallback((id: string) => {
+    setPins((current) => removePin(current, id))
+    // A note that is no longer on the edge of the screen has nothing keeping
+    // its window open either.
+    setKept((current) => {
+      if (current !== id) return current
+      void hidePanel('note')
+      return null
+    })
+  }, [])
 
   return { pins, togglePin: toggle, renamePin: rename, unpin: forget }
 }
