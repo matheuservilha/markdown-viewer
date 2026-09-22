@@ -24,8 +24,10 @@ import {
   type Entry,
   type FileVersion,
   nativeBaseName,
+  withoutExtension,
 } from '~/platform/fs'
 import { encode, type TextShape } from '~/platform/text'
+import { send } from '~/platform/channel'
 
 /** The shape a note is born with: plain UTF-8, newline endings, no BOM. */
 const DRAFT_SHAPE: TextShape = { eol: '\n', bom: false, encoding: 'utf-8', lossy: false }
@@ -40,6 +42,11 @@ export interface Tab {
   preview: boolean
   /** Full path of a file opened outside every base. */
   label?: string
+  /**
+   * A draft somebody named by hand. It stops taking its name from its own
+   * first line, because the name it was given is the one they want.
+   */
+  named?: boolean
 }
 
 export interface Doc {
@@ -51,7 +58,39 @@ export interface Doc {
   conflict: boolean
   /** Set when the file is no longer on disk. */
   gone: boolean
+  /**
+   * Counts the times the text was replaced from outside the editor, by
+   * another window typing into the same note. The editor takes the text in
+   * when this moves, dirty or not.
+   */
+  rev?: number
+  /**
+   * The unsaved text came from another window, which is the one that will
+   * write it. Saving it from here too would be two writes racing for the file.
+   */
+  remote?: boolean
 }
+
+/** The note being renamed: a tab, or a pinned file that is not open in one. */
+export interface RenameTarget {
+  id: string
+  baseId: string
+  path: string
+  name: string
+}
+
+/** What renaming a note from its title came to. */
+export type RenameOutcome =
+  | {
+      ok: true
+      /** The note's id afterwards, which moves with the path of a file. */
+      id: string
+      name: string
+      path?: string
+      baseId?: string
+      label?: string
+    }
+  | { ok: false; message: string }
 
 export interface State {
   bases: Base[]
@@ -79,12 +118,14 @@ type Action =
   | { type: 'folder/toggled'; id: string }
   | { type: 'tab/opened'; tab: Tab }
   | { type: 'tab/pinned'; id: string }
-  | { type: 'tab/renamed'; id: string; name: string }
+  | { type: 'tab/renamed'; id: string; name: string; named?: boolean }
   | { type: 'tab/closed'; id: string }
   | { type: 'tab/activated'; id: string }
   | { type: 'doc/loaded'; id: string; doc: Doc }
   | { type: 'doc/edited'; id: string; text: string }
+  | { type: 'doc/synced'; id: string; text: string }
   | { type: 'doc/saved'; id: string; version: FileVersion }
+  | { type: 'doc/saved-elsewhere'; id: string; text: string; version: FileVersion }
   | { type: 'doc/conflicted'; id: string }
   | { type: 'doc/vanished'; id: string }
   | { type: 'filter/set'; value: string }
@@ -92,6 +133,7 @@ type Action =
   | { type: 'session/restored'; pending: string[] }
   | { type: 'folder/expanded'; id: string }
   | { type: 'entry/moved'; baseId: string; from: string; to: string }
+  | { type: 'loose/moved'; from: string; to: string }
   | { type: 'entry/removed'; baseId: string; path: string }
   | { type: 'folders/collapsed' }
   | { type: 'recents/set'; recents: Recents }
@@ -150,16 +192,24 @@ function reducer(state: State, action: Action): State {
       }
 
     /**
-     * Only a draft is renamed this way, and only by its own first line. A file
-     * is renamed on disk, by `entry/moved`, because its name is the name of
-     * something that exists.
+     * Only a draft is renamed this way: by its own first line, or by hand from
+     * its title. A file is renamed on disk, by `entry/moved`, because its name
+     * is the name of something that exists.
+     *
+     * A name given by hand sticks. The first line no longer reaches it.
      */
     case 'tab/renamed': {
       const tab = state.tabs.find((candidate) => candidate.id === action.id)
-      if (!tab || tab.name === action.name || !isDraft(tab)) return state
+      if (!tab || !isDraft(tab)) return state
+      if (tab.named && !action.named) return state
+      if (tab.name === action.name && (tab.named || !action.named)) return state
       return {
         ...state,
-        tabs: state.tabs.map((one) => (one.id === action.id ? { ...one, name: action.name } : one)),
+        tabs: state.tabs.map((one) =>
+          one.id === action.id
+            ? { ...one, name: action.name, ...(action.named ? { named: true } : {}) }
+            : one,
+        ),
       }
     }
 
@@ -191,7 +241,51 @@ function reducer(state: State, action: Action): State {
         // Typing pins the tab. Without this, a preview tab the person has
         // already written in would be thrown away by the next single click.
         tabs: state.tabs.map((tab) => (tab.id === action.id ? { ...tab, preview: false } : tab)),
-        docs: { ...state.docs, [action.id]: { ...doc, text: action.text, dirty: true } },
+        docs: {
+          ...state.docs,
+          [action.id]: { ...doc, text: action.text, dirty: true, remote: false },
+        },
+      }
+    }
+
+    case 'doc/synced': {
+      const doc = state.docs[action.id]
+      if (!doc || doc.text === action.text) return state
+      return {
+        ...state,
+        tabs: state.tabs.map((tab) => (tab.id === action.id ? { ...tab, preview: false } : tab)),
+        docs: {
+          ...state.docs,
+          [action.id]: {
+            ...doc,
+            text: action.text,
+            dirty: true,
+            remote: true,
+            rev: (doc.rev ?? 0) + 1,
+          },
+        },
+      }
+    }
+
+    /**
+     * Another window wrote this note. The stamp is taken either way, so that
+     * the next save from here does not mistake that write for somebody
+     * else's; the dot goes only if what was written is what is here.
+     */
+    case 'doc/saved-elsewhere': {
+      const doc = state.docs[action.id]
+      if (!doc) return state
+      const same = doc.text === action.text
+      return {
+        ...state,
+        docs: {
+          ...state.docs,
+          [action.id]: {
+            ...doc,
+            version: action.version,
+            ...(same ? { dirty: false, conflict: false, remote: false } : {}),
+          },
+        },
       }
     }
 
@@ -202,7 +296,13 @@ function reducer(state: State, action: Action): State {
         ...state,
         docs: {
           ...state.docs,
-          [action.id]: { ...doc, dirty: false, conflict: false, version: action.version },
+          [action.id]: {
+            ...doc,
+            dirty: false,
+            conflict: false,
+            remote: false,
+            version: action.version,
+          },
         },
       }
     }
@@ -269,6 +369,26 @@ function reducer(state: State, action: Action): State {
         state.activeId === null ? null : remapId(state.activeId, action.baseId, under, moved)
 
       return { ...state, docs, expanded, tabs, activeId }
+    }
+
+    /**
+     * A loose file renamed. It is its own base, so the base id is the path,
+     * and the tab and the document follow it to the new one.
+     */
+    case 'loose/moved': {
+      const from = entryId(action.from, '')
+      const to = entryId(action.to, '')
+      const docs = { ...state.docs }
+      if (docs[from]) {
+        docs[to] = docs[from]
+        delete docs[from]
+      }
+      const tabs = state.tabs.map((tab) =>
+        tab.id === from
+          ? { ...tab, id: to, baseId: action.to, name: nativeBaseName(action.to), label: action.to }
+          : tab,
+      )
+      return { ...state, docs, tabs, activeId: state.activeId === from ? to : state.activeId }
     }
 
     case 'entry/removed': {
@@ -433,7 +553,14 @@ export function useWorkspace() {
     const id = entryId(DRAFT_BASE, draft.id)
     dispatch({
       type: 'tab/opened',
-      tab: { id, baseId: DRAFT_BASE, path: draft.id, name: draft.name, preview: false },
+      tab: {
+        id,
+        baseId: DRAFT_BASE,
+        path: draft.id,
+        name: draft.name,
+        preview: false,
+        ...(draft.named ? { named: true } : {}),
+      },
     })
     dispatch({
       type: 'doc/loaded',
@@ -505,6 +632,9 @@ export function useWorkspace() {
         }
         const version = await fileSystem().write(tab.baseId, tab.path, encode(doc.text, doc.shape))
         dispatch({ type: 'doc/saved', id, version })
+        // The same note may be open on the edge of the screen, and it should
+        // stop calling itself unsaved at the same moment this tab does.
+        send('doc:saved', { id, text: doc.text, version })
       } catch (error) {
         report(error)
       }
@@ -538,14 +668,17 @@ export function useWorkspace() {
   const checkExternalChanges = useCallback(async () => {
     for (const tab of latest.current.tabs) {
       const doc = latest.current.docs[tab.id]
-      if (!doc) continue
+      // A draft has no file, so there is nothing on disk for it to be behind.
+      if (!doc || isDraft(tab)) continue
       const onDisk = await fileSystem().stat(tab.baseId, tab.path)
       if (!onDisk) {
         dispatch({ type: 'doc/vanished', id: tab.id })
         continue
       }
       if (onDisk.modifiedAt <= doc.version.modifiedAt) continue
-      if (doc.dirty) dispatch({ type: 'doc/conflicted', id: tab.id })
+      // Text that came from the note on the edge of the screen is the note's
+      // to write, and that write is very likely what just changed the file.
+      if (doc.dirty && !doc.remote) dispatch({ type: 'doc/conflicted', id: tab.id })
       else await reload(tab.id)
     }
   }, [reload])
@@ -600,6 +733,84 @@ export function useWorkspace() {
       }
     },
     [loadChildren, report],
+  )
+
+  /**
+   * Renames the note from its own title: a draft in memory, a file on disk.
+   *
+   * `stem` is the name without the extension, which the title does not let
+   * anybody touch. The note does not have to be open in a tab: a file pinned
+   * to the edge of the screen is renamed from the note that floats out of it.
+   * Hands back what went wrong, so the title can go back to the old name and
+   * say why.
+   */
+  const renameDocument = useCallback(
+    async (tab: RenameTarget, stem: string): Promise<RenameOutcome> => {
+      const id = tab.id
+      const name = stem.trim()
+      if (name === '') return { ok: false, message: 'O nome não pode ficar vazio.' }
+      if (/[/\\:]/.test(name)) {
+        return { ok: false, message: 'O nome não pode ter barra nem dois-pontos.' }
+      }
+
+      if (isDraft(tab)) {
+        if (!latest.current.tabs.some((candidate) => candidate.id === id)) {
+          return { ok: false, message: 'Esse rascunho não está mais aberto.' }
+        }
+        dispatch({ type: 'tab/renamed', id, name, named: true })
+        return { ok: true, id, name }
+      }
+
+      const extension = tab.name.slice(withoutExtension(tab.name).length)
+      const fileName = name + extension
+      if (fileName === tab.name) return { ok: true, id, name: fileName }
+
+      try {
+        const files = fileSystem()
+        if (tab.path === '') {
+          if (!files.renameLoose) {
+            return { ok: false, message: 'Aqui não dá para renomear um arquivo solto.' }
+          }
+          const target = await files.renameLoose(tab.baseId, fileName)
+          dispatch({ type: 'loose/moved', from: tab.baseId, to: target })
+          dispatch({
+            type: 'recents/set',
+            recents: rememberFile({
+              baseId: target,
+              path: '',
+              name: fileName,
+              label: target,
+            }),
+          })
+          return {
+            ok: true,
+            id: entryId(target, ''),
+            name: fileName,
+            baseId: target,
+            label: target,
+          }
+        }
+
+        const parent = parentPath(tab.path)
+        const target = joinPath(parent, fileName)
+        // Two names that differ only in case are the same file on a Mac, and
+        // renaming onto it is renaming onto itself, which is allowed.
+        const clash = target.toLowerCase() !== tab.path.toLowerCase()
+        if (clash && (await files.stat(tab.baseId, target))) {
+          return {
+            ok: false,
+            message: 'Já existe um arquivo chamado ' + fileName + ' nessa pasta.',
+          }
+        }
+        await files.move(tab.baseId, tab.path, target)
+        dispatch({ type: 'entry/moved', baseId: tab.baseId, from: tab.path, to: target })
+        await loadChildren(tab.baseId, parent)
+        return { ok: true, id: entryId(tab.baseId, target), name: fileName, path: target }
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      }
+    },
+    [loadChildren],
   )
 
   const duplicateEntry = useCallback(
@@ -880,6 +1091,7 @@ export function useWorkspace() {
       restoreSession,
       createEntry,
       renameEntry,
+      renameDocument,
       duplicateEntry,
       trashEntry,
       revealEntry,
@@ -895,6 +1107,10 @@ export function useWorkspace() {
       watchBases,
       pinTab: (id: string) => dispatch({ type: 'tab/pinned', id }),
       renameTab: (id: string, name: string) => dispatch({ type: 'tab/renamed', id, name }),
+      /** Text typed into the same note in another window. */
+      sync: (id: string, text: string) => dispatch({ type: 'doc/synced', id, text }),
+      savedElsewhere: (id: string, text: string, version: FileVersion) =>
+        dispatch({ type: 'doc/saved-elsewhere', id, text, version }),
       closeTab: (id: string) => dispatch({ type: 'tab/closed', id }),
       activateTab: (id: string) => dispatch({ type: 'tab/activated', id }),
       edit: (id: string, text: string) => dispatch({ type: 'doc/edited', id, text }),
@@ -913,6 +1129,7 @@ export function useWorkspace() {
       expandFolder,
       revealPath,
       duplicateEntry,
+      renameDocument,
       renameEntry,
       revealEntry,
       trashEntry,

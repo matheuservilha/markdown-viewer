@@ -10,6 +10,7 @@ import {
   removePin,
   renamePin,
   reorderPins,
+  repointPin,
   togglePin,
   type Pin,
 } from './pinned'
@@ -104,6 +105,23 @@ describe('renamePin and recolourPin', () => {
 
   it('changes the colour', () => {
     expect(findPin(recolourPin(pins, 'a', 'coral'), 'a')?.color).toBe('coral')
+  })
+})
+
+describe('repointPin', () => {
+  const pins = addPin(addPin([], target('a')), target('b'))
+
+  it('moves the note to its new address and keeps colour and place', () => {
+    const moved = repointPin(pins, 'a', target('c', 'c.md'))
+    expect(moved.map((pin) => pin.id)).toEqual(['c', 'b'])
+    expect(moved[0]?.color).toBe(pins[0]?.color)
+    expect(moved[0]?.name).toBe('c.md')
+  })
+
+  it('takes the full path of a loose file, and drops one that no longer applies', () => {
+    const loose = repointPin(pins, 'a', { ...target('/x/n.md'), label: '/x/n.md' })
+    expect(loose[0]?.label).toBe('/x/n.md')
+    expect(repointPin(loose, '/x/n.md', target('d'))[0]).not.toHaveProperty('label')
   })
 })
 

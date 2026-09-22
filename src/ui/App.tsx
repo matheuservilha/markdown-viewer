@@ -15,11 +15,12 @@ import {
   saveDrafts,
   type Draft,
 } from '~/app/drafts'
-import { isDraftPin, isPinned, type Pin, type PinTarget } from '~/app/pinned'
+import { findPin, isDraftPin, isPinned, type Pin, type PinTarget } from '~/app/pinned'
+import { on, send, type LiveDoc } from '~/platform/channel'
 import { useDock } from './useDock'
 import { onTrayNewNote } from '~/platform/tray'
 import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
-import { useWorkspace, type Doc, type Tab } from '~/app/store'
+import { useWorkspace, type Doc, type RenameTarget, type Tab } from '~/app/store'
 import { entryId, nativeBaseName, parentPath, type Entry } from '~/platform/fs'
 import type { Heading } from '~/editor/outline'
 import { EditorView, type Command } from '@codemirror/view'
@@ -355,18 +356,7 @@ export function App() {
     opacity: settings.noteOpacity,
     readOnly: settings.readOnly,
 
-    draftText: useCallback((pinId: string) => latestState.current.docs[pinId]?.text, []),
-
-    onDraftText: useCallback(
-      (pinId: string, next: string) => {
-        actions.edit(pinId, next)
-        // The tab, the note and the square on the edge of the screen show the
-        // same draft, so they answer to the same name: its own first line.
-        const tab = latestState.current.tabs.find((one: Tab) => one.id === pinId)
-        if (tab) actions.renameTab(pinId, noteTitle(next, tab.name))
-      },
-      [actions],
-    ),
+    liveDoc: useCallback((pinId: string) => liveOf(latestState.current.docs[pinId]), []),
 
     /**
      * The square at the foot of the column writes an ordinary draft, in an
@@ -407,8 +397,79 @@ export function App() {
     ),
   })
 
-  const { pins } = dock
+  const { pins, renamePin: renameSquare, repointPin } = dock
   const pinnedActive = activeTab !== null && isPinned(pins, activeTab.id)
+
+  /**
+   * The same note, typed into or saved from the note on the edge of the
+   * screen. The tab here takes the text as it comes, so it is one note in two
+   * places and not two copies of it; the note is the one that writes it.
+   *
+   * A draft still unnamed by hand takes its name from its first line, in the
+   * tab strip and on its square at the same time, wherever it was typed.
+   */
+  useEffect(() => {
+    const stops = [
+      on('doc:text', ({ id, text }) => {
+        if (!latestState.current.docs[id]) return
+        actions.sync(id, text)
+        const tab = latestState.current.tabs.find((one: Tab) => one.id === id)
+        if (tab && isDraft(tab) && !tab.named) {
+          const named = noteTitle(text, tab.name)
+          actions.renameTab(id, named)
+          renameSquare(id, named)
+        }
+      }),
+      on('doc:saved', ({ id, text, version }) => actions.savedElsewhere(id, text, version)),
+    ]
+    return () => {
+      for (const stop of stops) stop()
+    }
+  }, [actions, renameSquare])
+
+  /**
+   * Renames a note from its title, here or in the note on the edge of the
+   * screen. The square follows, and so does the kept note: a draft by its
+   * name, a file by its new address.
+   */
+  const renameFromTitle = useCallback(
+    async (target: RenameTarget, stem: string): Promise<string | null> => {
+      const before = liveOf(latestState.current.docs[target.id])
+      const outcome = await actions.renameDocument(target, stem)
+      if (!outcome.ok) return outcome.message
+      if (outcome.id === target.id) {
+        renameSquare(target.id, outcome.name)
+        return null
+      }
+      const view = views.current[target.id]
+      if (view) views.current = { ...views.current, [outcome.id]: view }
+      repointPin(
+        target.id,
+        {
+          id: outcome.id,
+          baseId: outcome.baseId ?? target.baseId,
+          path: outcome.path ?? target.path,
+          name: outcome.name,
+          ...(outcome.label === undefined ? {} : { label: outcome.label }),
+        },
+        before,
+      )
+      return null
+    },
+    [actions, renameSquare, repointPin],
+  )
+
+  useEffect(
+    () =>
+      on('note:rename', ({ id, name }) => {
+        const pin = findPin(latestPins.current, id)
+        if (!pin) return
+        void renameFromTitle(pin, name).then((message) => {
+          if (message !== null) send('note:rename-failed', { id, message })
+        })
+      }),
+    [renameFromTitle],
+  )
 
   useEffect(() => {
     // oxlint-disable-next-line immutability
@@ -506,12 +567,16 @@ export function App() {
     // The drafts themselves, text and all, because there is nowhere else they
     // could be read back from.
     saveDrafts(
-      state.tabs.filter(isDraft).map((tab) => ({
-        id: tab.path,
-        name: tab.name,
-        text: state.docs[tab.id]?.text ?? '',
-        at: Date.now(),
-      })),
+      state.tabs.filter(isDraft).map((tab) => {
+        const draft: Draft = {
+          id: tab.path,
+          name: tab.name,
+          text: state.docs[tab.id]?.text ?? '',
+          at: Date.now(),
+        }
+        if (tab.named) draft.named = true
+        return draft
+      }),
     )
   }, [
     state.bases,
@@ -540,12 +605,18 @@ export function App() {
   useEffect(() => {
     // The text is read so that every keystroke restarts the wait: that is the
     // whole point of the delay, not an accident of the dependency list.
-    if (!settings.autosave || !activeDoc) return
+    //
+    // A note pinned to the edge of the screen always saves itself, here as in
+    // the note that floats out of it: it is one note in two places, and it
+    // cannot follow two rules. A draft has no file to save to, and text that
+    // came from the other window is that window's to write.
+    if (!(settings.autosave || pinnedActive) || !activeDoc || !activeTab) return
+    if (isDraft(activeTab) || activeDoc.remote) return
     const { text, dirty, conflict } = activeDoc
     if (text === undefined || !dirty || conflict) return
     const timer = window.setTimeout(saveActive, AUTOSAVE_DELAY)
     return () => window.clearTimeout(timer)
-  }, [activeDoc, saveActive, settings.autosave])
+  }, [activeDoc, activeTab, pinnedActive, saveActive, settings.autosave])
 
   /**
    * Noticing what changed behind our back. Three ways, because no single one
@@ -602,7 +673,9 @@ export function App() {
   // Saving on blur, and looking for changes made behind our back on focus.
   useEffect(() => {
     const onBlur = () => {
-      if (settings.autosave) saveActive()
+      // A pinned draft has no file yet, and saving it would ask where to put it.
+      const pinnedFile = pinnedActive && activeTab !== null && !isDraft(activeTab)
+      if (settings.autosave || pinnedFile) saveActive()
     }
     const onFocus = () => void actions.checkExternalChanges()
     window.addEventListener('blur', onBlur)
@@ -611,7 +684,7 @@ export function App() {
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('focus', onFocus)
     }
-  }, [actions, saveActive, settings.autosave])
+  }, [actions, activeTab, pinnedActive, saveActive, settings.autosave])
 
   /**
    * Closing a tab that has unsaved text asks first.
@@ -1148,12 +1221,20 @@ export function App() {
                   views.current = { ...views.current, [activeTab.id]: view }
                   persist()
                 }}
+                onRename={
+                  isLooseTab(activeTab) && !fileSystem().renameLoose
+                    ? undefined
+                    : (stem) => renameFromTitle(activeTab, stem)
+                }
                 onChange={(text) => {
                   actions.edit(activeTab.id, text)
+                  // The note on the edge of the screen, and the glance, show
+                  // the same text as it is typed.
+                  if (pinnedActive) send('doc:text', { id: activeTab.id, text })
                   // A draft has no file to take its name from, so it takes it
                   // from its own first line, in the tab strip and on its
-                  // square at the same time.
-                  if (isDraft(activeTab)) {
+                  // square at the same time. Until somebody names it by hand.
+                  if (isDraft(activeTab) && !activeTab.named) {
                     const named = noteTitle(text, activeTab.name)
                     actions.renameTab(activeTab.id, named)
                     dock.renamePin(activeTab.id, named)
@@ -1309,4 +1390,15 @@ function EmptyState({ hasBase, onOpenBase, onOpenFile }: EmptyStateProps) {
       </div>
     </div>
   )
+}
+
+/** What a floating window needs of a note the app has open. */
+function liveOf(doc: Doc | undefined): LiveDoc | undefined {
+  if (!doc) return undefined
+  return { text: doc.text, shape: doc.shape, version: doc.version, dirty: doc.dirty }
+}
+
+/** A file opened from outside every folder, which is a base of its own. */
+function isLooseTab(tab: Tab): boolean {
+  return tab.path === '' && !isDraft(tab)
 }

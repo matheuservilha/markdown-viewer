@@ -147,6 +147,25 @@ export class TauriFileSystem implements FileSystem {
     return this.entry(baseId, to, info.isDirectory ? 'directory' : 'file')
   }
 
+  async renameLoose(baseId: string, name: string): Promise<string> {
+    const cut = Math.max(baseId.lastIndexOf('/'), baseId.lastIndexOf('\\'))
+    const target = baseId.slice(0, cut + 1) + name
+    await invoke('allow_base', { path: target })
+    // A different name in the same folder, and not the same file in another
+    // case, is somebody else's file.
+    if (target.toLowerCase() !== baseId.toLowerCase()) {
+      const taken = await stat(target).then(
+        () => true,
+        () => false,
+      )
+      if (taken) throw new Error('Já existe um arquivo chamado ' + name + ' nessa pasta.')
+    }
+    await rename(baseId, target)
+    this.roots.delete(baseId)
+    this.roots.set(target, target)
+    return target
+  }
+
   async duplicate(baseId: string, path: string): Promise<Entry> {
     const parent = parentPath(path)
     let name = copyName(baseName(path), 'copia')

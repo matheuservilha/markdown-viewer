@@ -15,6 +15,8 @@
 import { isDesktop } from '.'
 import type { Pin, PinColor } from '~/app/pinned'
 import type { Side } from '~/app/dock-layout'
+import type { FileVersion } from './fs'
+import type { TextShape } from './text'
 
 const EVENT = 'app:message'
 
@@ -30,11 +32,26 @@ export interface DockState {
   nextColor: PinColor
 }
 
+/**
+ * The note as the app's window has it right now, unsaved text and all.
+ *
+ * Present whenever the app has the note open: a draft always, a file when it
+ * is open in a tab. The panel then shows this and not the disk, so the note
+ * on the edge of the screen is the same note as the one in the tab, down to
+ * the last letter nobody has saved yet.
+ */
+export interface LiveDoc {
+  text: string
+  shape: TextShape
+  version: FileVersion
+  dirty: boolean
+}
+
 /** A note handed to one of the floating windows, ready to show. */
 export interface PeekNote {
   pin: Pin
-  /** The text, for a draft. A file is read from disk by the panel itself. */
-  draftText?: string
+  /** What the app has in memory. Without it, the panel reads the file itself. */
+  live?: LiveDoc
   theme: 'light' | 'dark'
   /** How solid the card is, so a slider being dragged shows up at once. */
   opacity: number
@@ -74,8 +91,24 @@ export interface Messages {
   'note:unpin': { id: string }
   /** A colour chosen from inside the note itself. */
   'note:recolour': { id: string; color: PinColor }
-  /** A draft edited in the kept note; the app's window stores it. */
-  'note:draft': { id: string; text: string }
+  /**
+   * The text of a note, just typed in one window, for every other window that
+   * has the same note open.
+   *
+   * It goes both ways and it carries the whole text, not the change: a note is
+   * a few kilobytes, and a whole text cannot be applied twice or out of order
+   * into something different from what was typed.
+   */
+  'doc:text': { id: string; text: string }
+  /** A note was written to disk by one window, so the others stop calling it unsaved. */
+  'doc:saved': { id: string; text: string; version: FileVersion }
+  /**
+   * A new name typed into the title of the kept note. The app's window is the
+   * one that renames, because it owns the tab, the pin and the file.
+   */
+  'note:rename': { id: string; name: string }
+  /** The rename asked for from the note did not happen, and this is why. */
+  'note:rename-failed': { id: string; message: string }
   /** Write what is unwritten, asked for from outside the note. */
   'note:save': null
   /** Put the note away, asking first if there is anything unwritten in it. */

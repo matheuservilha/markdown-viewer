@@ -89,6 +89,48 @@ export const editorTheme = EditorView.theme({
     letterSpacing: '-0.025em',
     lineHeight: '1.2',
   },
+  // The name can be typed into. It says so only when asked, by the pointer or
+  // the keyboard: a title that looks like a text field all the time stops
+  // looking like a title.
+  '.cm-md-title-name': {
+    outline: 'none',
+    borderRadius: 'var(--radius-sm)',
+    transition: 'box-shadow 120ms var(--ease), background-color 120ms var(--ease)',
+  },
+  '.cm-md-title.is-editable .cm-md-title-name': { cursor: 'text' },
+  '.cm-md-title.is-editable .cm-md-title-name:hover': {
+    boxShadow: '0 0 0 4px var(--surface-hover)',
+    backgroundColor: 'var(--surface-hover)',
+  },
+  '.cm-md-title.is-editable .cm-md-title-name:focus': {
+    boxShadow: '0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent)',
+    backgroundColor: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+  },
+  '.cm-md-title[data-pending] .cm-md-title-name': { opacity: '0.6' },
+  // The extension is part of the name on disk but not of what is typed, so it
+  // is set apart: another face, smaller, quieter, and out of reach of the
+  // cursor and the selection.
+  '.cm-md-title-ext': {
+    marginLeft: '0.18em',
+    color: 'var(--text-tertiary)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.46em',
+    fontWeight: '450',
+    letterSpacing: '0',
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+  },
+  '.cm-md-title-refused': {
+    display: 'none',
+    marginTop: '6px',
+    color: 'var(--tone-red)',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '13px',
+    fontWeight: '450',
+    letterSpacing: '0',
+    lineHeight: '1.4',
+  },
+  '.cm-md-title[data-refused] .cm-md-title-refused': { display: 'block' },
 
   // Headings. Each line keeps its own line-height so that revealing the '#'
   // never changes the height of the line.

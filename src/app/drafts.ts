@@ -29,6 +29,8 @@ export interface Draft {
   text: string
   /** When it was last written, so the oldest goes first if room runs out. */
   at: number
+  /** Named by hand, so it no longer takes its name from its first line. */
+  named?: boolean
 }
 
 export function isDraft(tab: { baseId: string }): boolean {

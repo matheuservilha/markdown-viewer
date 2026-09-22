@@ -120,6 +120,26 @@ export function renamePin(pins: readonly Pin[], id: string, name: string): Pin[]
   return pins.map((pin) => (pin.id === id ? { ...pin, name } : pin))
 }
 
+/**
+ * Points a note at the same text under a new address, keeping its colour and
+ * its place in the column: a file renamed from its title is still that note.
+ */
+export function repointPin(pins: readonly Pin[], from: string, target: PinTarget): Pin[] {
+  return pins.map((pin) => {
+    if (pin.id !== from) return pin
+    const { label: _label, ...rest } = pin
+    const next: Pin = {
+      ...rest,
+      id: target.id,
+      baseId: target.baseId,
+      path: target.path,
+      name: target.name,
+    }
+    if (target.label !== undefined) next.label = target.label
+    return next
+  })
+}
+
 export function recolourPin(pins: readonly Pin[], id: string, color: PinColor): Pin[] {
   return pins.map((pin) => (pin.id === id ? { ...pin, color } : pin))
 }

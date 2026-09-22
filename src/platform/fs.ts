@@ -92,6 +92,14 @@ export interface FileSystem {
   createFolder(baseId: string, path: string): Promise<Entry>
   /** Renames, and moves, within one base. */
   move(baseId: string, from: string, to: string): Promise<Entry>
+  /**
+   * Renames a loose file where it sits, and hands back its new base id.
+   *
+   * A loose file is its own base, so this is not a `move`: the base itself
+   * changes. Absent where the platform cannot rename a file it was only given
+   * a handle to.
+   */
+  renameLoose?(baseId: string, name: string): Promise<string>
   /** Copies a file beside itself under a free name. */
   duplicate(baseId: string, path: string): Promise<Entry>
   /**

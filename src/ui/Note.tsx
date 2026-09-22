@@ -26,8 +26,8 @@ import { CloseIcon, OpenInAppIcon, UnpinIcon } from './icons'
 
 /** How long the typing has to stop before the note is written. */
 const SAVE_DELAY = 1100
-/** And how long before a draft is handed back to the app to be stored. */
-const DRAFT_DELAY = 350
+/** How long a rename asked of the app's window may take before it is taken as done. */
+const RENAME_WAIT = 5000
 
 const DRAFT_SHAPE: TextShape = { eol: '\n', bom: false, encoding: 'utf-8', lossy: false }
 
@@ -133,22 +133,28 @@ export function Note() {
       ...(pin.label === undefined ? {} : { label: pin.label }),
     }
 
-    if (isDraftPin(pin)) {
-      text.current = note.draftText ?? ''
-      shape.current = DRAFT_SHAPE
-      version.current = { size: 0, modifiedAt: 0 }
-      setDirty(false)
+    // The app has this note open, so what it has is the note: unsaved text
+    // included. The disk is only asked when the app does not have it.
+    if (note.live || isDraftPin(pin)) {
+      const live = note.live
+      text.current = live?.text ?? ''
+      shape.current = live?.shape ?? DRAFT_SHAPE
+      version.current = live?.version ?? { size: 0, modifiedAt: 0 }
+      // A draft is never a file, so there is nothing for it to be behind.
+      const unsaved = !isDraftPin(pin) && (live?.dirty ?? false)
+      setDirty(unsaved)
       setConflict(false)
       setLoaded({
         status: 'ready',
         tab,
         doc: {
           text: text.current,
-          shape: DRAFT_SHAPE,
+          shape: shape.current,
           version: version.current,
-          dirty: false,
+          dirty: unsaved,
           conflict: false,
           gone: false,
+          rev: 0,
         },
       })
       return
@@ -176,7 +182,7 @@ export function Note() {
         setLoaded({
           status: 'ready',
           tab,
-          doc: { ...file, dirty: false, conflict: false, gone: false },
+          doc: { ...file, dirty: false, conflict: false, gone: false, rev: 0 },
         })
       } catch (error) {
         if (cancelled) return
@@ -210,13 +216,14 @@ export function Note() {
             return
           }
         }
-        version.current = await files.write(
-          pin.baseId,
-          pin.path,
-          encode(text.current, shape.current),
-        )
+        const written = text.current
+        version.current = await files.write(pin.baseId, pin.path, encode(written, shape.current))
         setConflict(false)
-        setDirty(false)
+        // Typing that went on while the bytes were on their way is still unsaved.
+        if (text.current === written) setDirty(false)
+        // The tab in the app is the same note, and stops calling itself unsaved
+        // at the same moment.
+        send('doc:saved', { id: pin.id, text: written, version: version.current })
       } catch {
         // A write that failed leaves the dot up, which is the honest report:
         // there is still something here that is not on disk.
@@ -229,22 +236,100 @@ export function Note() {
   const onChange = useCallback(
     (next: string) => {
       text.current = next
-      setDirty(true)
       window.clearTimeout(timer.current)
       if (!pin) return
-      if (isDraftPin(pin)) {
-        timer.current = window.setTimeout(
-          () => send('note:draft', { id: pin.id, text: next }),
-          DRAFT_DELAY,
-        )
-        return
-      }
+      // Every keystroke goes to the app at once, so the tab there is never a
+      // letter behind the note. A draft lives in the app and nowhere else.
+      send('doc:text', { id: pin.id, text: next })
+      if (isDraftPin(pin)) return
+      setDirty(true)
       timer.current = window.setTimeout(() => void save(), SAVE_DELAY)
     },
     [pin, save],
   )
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  /**
+   * The same note, written in or saved from the app's window.
+   *
+   * The text typed there comes in as a new revision, which the editor takes
+   * in without moving the cursor. The app writes what was typed there, so
+   * nothing is scheduled here: two windows saving the same keystroke would
+   * be two writes racing for one file.
+   */
+  useEffect(() => {
+    if (!id) return
+    const stops = [
+      on('doc:text', (message) => {
+        if (message.id !== id || message.text === text.current) return
+        window.clearTimeout(timer.current)
+        text.current = message.text
+        if (pin && !isDraftPin(pin)) setDirty(true)
+        setLoaded((current) =>
+          current.status !== 'ready'
+            ? current
+            : {
+                ...current,
+                doc: { ...current.doc, text: message.text, rev: (current.doc.rev ?? 0) + 1 },
+              },
+        )
+      }),
+      on('doc:saved', (message) => {
+        if (message.id !== id) return
+        version.current = message.version
+        if (message.text === text.current) {
+          setDirty(false)
+          setConflict(false)
+        }
+      }),
+    ]
+    return () => {
+      for (const stop of stops) stop()
+    }
+  }, [id, pin])
+
+  /**
+   * Renaming from the title is done by the app's window, which owns the tab,
+   * the square and the file. The answer comes back as the note shown again
+   * under its new name, or as the reason it could not be.
+   */
+  const renaming = useRef<((problem: string | null) => void) | null>(null)
+  useEffect(() => {
+    const settle = (problem: string | null) => {
+      renaming.current?.(problem)
+      renaming.current = null
+    }
+    const stops = [
+      on('note:rename-failed', ({ message }) => settle(message)),
+      on('note:show', () => settle(null)),
+    ]
+    return () => {
+      for (const stop of stops) stop()
+    }
+  }, [])
+
+  const rename = useCallback(
+    async (stem: string): Promise<string | null> => {
+      if (!pin) return 'Essa nota não está mais aberta.'
+      // Whatever is waiting to be written goes to the file under the name it
+      // has now. A save that fired after the rename would bring the old file
+      // back.
+      window.clearTimeout(timer.current)
+      if (!isDraftPin(pin) && dirty) await save()
+      return new Promise<string | null>((resolve) => {
+        renaming.current = resolve
+        send('note:rename', { id: pin.id, name: stem })
+        window.setTimeout(() => {
+          if (renaming.current === resolve) {
+            renaming.current = null
+            resolve(null)
+          }
+        }, RENAME_WAIT)
+      })
+    },
+    [dirty, pin, save],
+  )
 
   /** Puts the note away. Whatever had to be asked has been asked by now. */
   const close = useCallback(() => {
@@ -326,7 +411,13 @@ export function Note() {
             className="icon-button is-small"
             aria-label="Abrir no app"
             title="Abrir no app"
-            onClick={() => send('note:open-in-app', { id: pin.id })}
+            onClick={() => {
+              // Written first, so the app does not open the file a pause
+              // behind what is on screen here.
+              window.clearTimeout(timer.current)
+              const written = !draft && dirty ? save() : Promise.resolve()
+              void written.then(() => send('note:open-in-app', { id: pin.id }))
+            }}
           >
             <OpenInAppIcon size={14} />
           </button>
@@ -437,7 +528,9 @@ export function Note() {
           <div className="peek-body">
             <EditorPane
               key={loaded.tab.id}
-              tab={loaded.tab}
+              // The name is the square's, which follows a rename made here or
+              // in the app.
+              tab={{ ...loaded.tab, name: pin.name }}
               doc={{ ...loaded.doc, dirty }}
               readOnly={note.readOnly || loaded.doc.shape.lossy}
               getInitialView={() => undefined}
@@ -446,6 +539,7 @@ export function Note() {
               onSave={() => void save()}
               onOutline={() => {}}
               onReady={() => {}}
+              onRename={rename}
             />
           </div>
         )}

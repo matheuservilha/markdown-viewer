@@ -1,14 +1,22 @@
-import { EditorSelection, EditorState } from '@codemirror/state'
+import { Annotation, EditorSelection, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import type { ViewState } from '~/app/session'
+import { isDraft } from '~/app/drafts'
 import { isPlainTextTab, type Doc, type Tab } from '~/app/store'
 import { bodyStart } from '~/editor/frontmatter'
 import { outlineOf, sameOutline, type Heading } from '~/editor/outline'
 import { editorExtensions, readOnlyCompartment, readOnlyExtension } from '~/editor/setup'
+import { documentTitle, titleCompartment, type Rename } from '~/editor/title'
 
 /** How long the cursor has to sit still before its position is worth storing. */
 const VIEW_REPORT_DELAY = 400
+
+/**
+ * Marks text that arrived from another window. It is already that window's
+ * edit, so it is not reported back as this one's.
+ */
+const fromElsewhere = Annotation.define<boolean>()
 
 interface Props {
   tab: Tab
@@ -28,6 +36,11 @@ interface Props {
   /** Hands the live editor out, so the panel can scroll it. */
   onReady: (view: EditorView | null) => void
   /**
+   * Renames the note from its title. Without it the title can only be read,
+   * which is right where there is nothing that could do the renaming.
+   */
+  onRename?: Rename
+  /**
    * Whether the cursor lands here as soon as the editor is built. True in the
    * app, where opening a file is a request to write in it. False in the note
    * that floats out on hover, which nobody asked to type in yet.
@@ -45,14 +58,24 @@ export function EditorPane({
   onSave,
   onOutline,
   onReady,
+  onRename,
   autoFocus = true,
 }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   /** Cursor and history per tab, so switching back lands where you left. */
   const parked = useRef(new Map<string, EditorState>())
-  const handlers = useRef({ onChange, onSave, onViewChange, onOutline, onReady })
-  handlers.current = { onChange, onSave, onViewChange, onOutline, onReady }
+  const handlers = useRef({ onChange, onSave, onViewChange, onOutline, onReady, onRename })
+  handlers.current = { onChange, onSave, onViewChange, onOutline, onReady, onRename }
+  /**
+   * One function for the life of the pane, which calls whatever renaming the
+   * parent hands in at the time. The title widget keeps the function it was
+   * built with, so it has to be this one.
+   */
+  const rename = useRef<Rename>(
+    (stem) => handlers.current.onRename?.(stem) ?? Promise.resolve('Não dá para renomear aqui.'),
+  )
+  const renames = onRename !== undefined
 
   useEffect(() => {
     const parent = host.current
@@ -66,9 +89,12 @@ export function EditorPane({
         plainText: isPlainTextTab(tab),
         readOnly,
         onSave: () => handlers.current.onSave(),
+        draft: isDraft(tab),
+        rename: renames ? rename.current : null,
       }),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) handlers.current.onChange(update.state.doc.toString())
+        const echo = update.transactions.some((tr) => tr.annotation(fromElsewhere))
+        if (update.docChanged && !echo) handlers.current.onChange(update.state.doc.toString())
         if (update.docChanged || update.selectionSet) report()
         // Every update and not only the ones that changed the text: parsing
         // happens in the background, so a document whose end was still being
@@ -179,7 +205,40 @@ export function EditorPane({
     })
   }, [readOnly])
 
-  /** A reload from disk is the one case where the text is replaced from outside. */
+  /** The title follows the name, and stops being editable where the text is. */
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: titleCompartment.reconfigure(
+        documentTitle(tab.name, isDraft(tab), readOnly || !renames ? null : rename.current),
+      ),
+    })
+    // `tab` is read for its name and its kind, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab.name, readOnly, renames])
+
+  /**
+   * The same note typed into in another window. Taken in whether or not there
+   * is unsaved text here, because it is the same unsaved text: the other
+   * window started from this one's.
+   *
+   * Only the part that differs is replaced, so the cursor here stays where it
+   * was instead of jumping to the end.
+   */
+  useEffect(() => {
+    const instance = view.current
+    if (!instance || doc.rev === undefined) return
+    const current = instance.state.doc.toString()
+    if (current === doc.text) return
+    instance.dispatch({
+      changes: difference(current, doc.text),
+      annotations: fromElsewhere.of(true),
+    })
+    // Only a new revision brings text in; the text alone changes on every
+    // keystroke typed here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.rev])
+
+  /** A reload from disk is the other case where the text is replaced from outside. */
   useEffect(() => {
     const instance = view.current
     if (!instance || doc.dirty) return
@@ -189,6 +248,21 @@ export function EditorPane({
   }, [doc.text, doc.dirty])
 
   return <div className="editor" ref={host} />
+}
+
+/** The smallest single replacement that turns `from` into `to`. */
+export function difference(from: string, to: string): { from: number; to: number; insert: string } {
+  let start = 0
+  const shorter = Math.min(from.length, to.length)
+  while (start < shorter && from.charCodeAt(start) === to.charCodeAt(start)) start++
+  let end = 0
+  while (
+    end < shorter - start &&
+    from.charCodeAt(from.length - 1 - end) === to.charCodeAt(to.length - 1 - end)
+  ) {
+    end++
+  }
+  return { from: start, to: from.length - end, insert: to.slice(start, to.length - end) }
 }
 
 /**

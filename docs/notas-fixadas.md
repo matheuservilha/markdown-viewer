@@ -24,7 +24,7 @@ o alfinete do app ou o da própria nota guardada.
 diálogo e sem arquivo nenhum no disco. Ela é um rascunho, igual ao que o `⌘N`
 já abria: aparece também como aba não salva na janela principal, e o `⌘S` de lá
 é que pergunta onde gravar. O nome dela é a primeira linha do que você
-escreveu, na aba e no quadradinho ao mesmo tempo.
+escreveu, na aba e no quadradinho ao mesmo tempo, até você dar um nome na mão.
 
 Fechar essa aba joga o texto fora, então a abinha vai junto. Arquivo é
 outra coisa: fechar a aba de um arquivo não desafixa nada, porque o arquivo
@@ -62,6 +62,39 @@ na digitação, **mesmo com "Salvar sozinho" desligado nos ajustes**: aqui não
 existe aba nem pergunta na hora de fechar, e o texto seria a única cópia. Se o
 arquivo mudou por fora enquanto você escrevia, ela não sobrescreve: aparece uma
 tarja com "Recarregar" e "Salvar mesmo assim".
+
+## A mesma nota nos dois lugares
+
+A nota da borda e a aba do app são a mesma nota, e não duas cópias. O que você
+digita numa aparece na outra letra por letra, nos dois sentidos, salvo ou não,
+e a olhada do hover também mostra o texto enquanto ele é escrito. Quem guarda o
+texto é a janela do app: a nota flutuante recebe dela o que ainda não foi
+salvo, em vez de ler o disco, e manda de volta cada tecla.
+
+Nota fixada **sempre grava sozinha, nos dois lugares**, com o ajuste "Salvar
+sozinho" ligado ou não. Uma nota em dois lugares não pode seguir duas regras.
+Grava a janela em que você digitou; a outra só apaga a marca de não salvo
+quando a gravação acontece, para as duas nunca disputarem o mesmo arquivo. O
+rascunho continua sem gravar nada, porque ainda não tem arquivo.
+
+## Renomear pelo título
+
+O título grande no alto da página é o nome da nota, e dá para editar ali
+mesmo, no app e na nota flutuante. Clique no nome, escreva, e o Enter ou o
+clique fora confirmam; o Esc desfaz. A extensão fica ao lado, em fonte mono
+menor, e não é editável: é `.md` no rascunho, e a extensão real no arquivo, o
+que inclui `.txt`.
+
+- **Arquivo:** o arquivo é renomeado no disco. A aba, a abinha na borda e a
+  nota aberta seguem o arquivo, com a cor e o lugar na coluna.
+- **Rascunho:** o nome passa a ser o que você deu, e a primeira linha deixa de
+  mandar nele. O `⌘S` já sugere esse nome.
+- **Recusado:** um nome vazio, com barra ou dois-pontos, ou de um arquivo que
+  já existe na pasta, volta ao nome anterior e mostra o motivo embaixo do
+  título.
+
+Arquivo solto, aberto de fora de qualquer pasta, só renomeia no desktop. No
+navegador o título dele fica só para leitura.
 
 A abinha de baixo, a do `+`, é vazada e veste a cor que a próxima nota vai ter.
 Clicar nela escreve um rascunho novo, que vira mais uma abinha na coluna e uma

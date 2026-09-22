@@ -24,17 +24,16 @@ import {
   addPin,
   findPin,
   freeColor,
-  isDraftPin,
   isPinned,
   loadPins,
   recolourPin,
   removePin,
   renamePin,
+  repointPin,
   savePins,
   type Pin,
   type PinTarget,
 } from '~/app/pinned'
-import { noteTitle } from '~/app/drafts'
 import {
   hidePanel,
   onChipMenuChoice,
@@ -46,7 +45,7 @@ import {
   watchChips,
   workArea,
 } from '~/platform/panels'
-import { on, send, type DockState, type PeekNote } from '~/platform/channel'
+import { on, send, type DockState, type LiveDoc, type PeekNote } from '~/platform/channel'
 
 /**
  * How long the pointer has to stay on one tab before its note floats out.
@@ -69,10 +68,11 @@ export interface DockOptions {
   /** How solid a floating note is, from the settings. */
   opacity: number
   readOnly: boolean
-  /** The text of a pinned note that is still only a draft. */
-  draftText: (id: string) => string | undefined
-  /** A draft edited in the note that was kept open. */
-  onDraftText: (id: string, text: string) => void
+  /**
+   * The note as the app has it in memory, when the app has it open. The panel
+   * shows this rather than the disk, so both show the same unsaved text.
+   */
+  liveDoc: (id: string) => LiveDoc | undefined
   /** Asked for by the tab that writes a new note. */
   onNewNote: () => PinTarget | null
   /** Asked for from the kept note: bring it into the app. */
@@ -138,8 +138,8 @@ export function useDock(options: DockOptions) {
       opacity: now.opacity,
       readOnly: now.readOnly,
     }
-    const text = isDraftPin(pin) ? now.draftText(pin.id) : undefined
-    if (text !== undefined) note.draftText = text
+    const live = now.liveDoc(pin.id)
+    if (live) note.live = live
     return note
   }, [])
 
@@ -358,18 +358,6 @@ export function useDock(options: DockOptions) {
         if (pin) send('note:show', describe({ ...pin, color }))
       }),
 
-      on('note:draft', ({ id, text }) => {
-        latest.current.options.onDraftText(id, text)
-        // A note written on the edge of the screen names itself after its own
-        // first line, wherever it is being typed into.
-        setPins((current) => {
-          const pin = findPin(current, id)
-          if (!pin || !isDraftPin(pin)) return current
-          const named = noteTitle(text, pin.name)
-          return named === pin.name ? current : renamePin(current, id, named)
-        })
-      }),
-
       on('note:open-in-app', ({ id }) => openInApp(id)),
     ]
 
@@ -391,14 +379,40 @@ export function useDock(options: DockOptions) {
    * it to the other window again.
    */
   const rename = useCallback(
-    (id: string, name: string) =>
+    (id: string, name: string) => {
       setPins((current) => {
         const pin = findPin(current, id)
-        if (!pin) return current
-        const next = isDraftPin(pin) ? noteTitle(name, pin.name) : name
-        return next === pin.name ? current : renamePin(current, id, next)
-      }),
-    [],
+        if (!pin || pin.name === name) return current
+        return renamePin(current, id, name)
+      })
+      // The kept note shows the name in its header and at the top of its page.
+      const pin = findPin(latest.current.pins, id)
+      if (pin && pin.name !== name && latest.current.kept === id) {
+        send('note:show', describe({ ...pin, name }))
+      }
+    },
+    [describe],
+  )
+
+  /**
+   * A file renamed from its title has a new address. The square follows it,
+   * and so does the kept note if it is this one: it is told where it lives now
+   * and handed the text it had, which has not changed.
+   */
+  const repoint = useCallback(
+    (from: string, target: PinTarget, live?: LiveDoc) => {
+      const pin = findPin(latest.current.pins, from)
+      if (!pin) return
+      setPins((current) => repointPin(current, from, target))
+      if (latest.current.kept !== from) return
+      setKept(target.id)
+      const [moved] = repointPin([pin], from, target)
+      if (!moved) return
+      const note = describe(moved)
+      if (live) note.live = live
+      send('note:show', note)
+    },
+    [describe],
   )
 
   /**
@@ -424,5 +438,5 @@ export function useDock(options: DockOptions) {
     forgetRef.current = forget
   }, [forget])
 
-  return { pins, togglePin: toggle, renamePin: rename, unpin: forget }
+  return { pins, togglePin: toggle, renamePin: rename, repointPin: repoint, unpin: forget }
 }

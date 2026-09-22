@@ -71,7 +71,28 @@ export function Peek() {
   }, [note])
 
   const pin = note?.pin ?? null
-  /** Reads the note. A draft arrives with its text; a file comes off disk. */
+
+  // Typed into in the app or in the kept note while this glance is up: it
+  // shows the same text, as it is being written.
+  useEffect(() => {
+    if (!pin) return
+    return on('doc:text', (message) => {
+      if (message.id !== pin.id) return
+      setLoaded((current) =>
+        current.status !== 'ready'
+          ? current
+          : {
+              ...current,
+              doc: { ...current.doc, text: message.text, rev: (current.doc.rev ?? 0) + 1 },
+            },
+      )
+    })
+  }, [pin])
+
+  /**
+   * Reads the note. What the app has open arrives with its text, unsaved or
+   * not; anything else comes off disk.
+   */
   useEffect(() => {
     let cancelled = false
     if (!note || !pin) {
@@ -88,17 +109,18 @@ export function Peek() {
       ...(pin.label === undefined ? {} : { label: pin.label }),
     }
 
-    if (isDraftPin(pin)) {
+    if (note.live || isDraftPin(pin)) {
       setLoaded({
         status: 'ready',
         tab,
         doc: {
-          text: note.draftText ?? '',
-          shape: DRAFT_SHAPE,
-          version: { size: 0, modifiedAt: 0 },
+          text: note.live?.text ?? '',
+          shape: note.live?.shape ?? DRAFT_SHAPE,
+          version: note.live?.version ?? { size: 0, modifiedAt: 0 },
           dirty: false,
           conflict: false,
           gone: false,
+          rev: 0,
         },
       })
       return
@@ -123,7 +145,7 @@ export function Peek() {
         setLoaded({
           status: 'ready',
           tab,
-          doc: { ...file, dirty: false, conflict: false, gone: false },
+          doc: { ...file, dirty: false, conflict: false, gone: false, rev: 0 },
         })
       } catch (error) {
         if (cancelled) return

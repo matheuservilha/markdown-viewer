@@ -19,7 +19,7 @@ import { documentSource } from './images'
 import { frontmatterBlock } from './frontmatter'
 import { seamlessMarkdown } from './seamless'
 import { tableBlocks } from './tables'
-import { documentTitle } from './title'
+import { documentTitle, titleCompartment, type Rename } from './title'
 import { editorTheme, markdownHighlight } from './theme'
 
 /**
@@ -42,6 +42,10 @@ export interface EditorOptions {
   plainText: boolean
   readOnly: boolean
   onSave: () => void
+  /** A draft, whose title gets the `.md` it will be saved with. */
+  draft?: boolean
+  /** Renames the note from its title. Without it the title is only read. */
+  rename?: Rename | null
 }
 
 export function editorExtensions({
@@ -51,6 +55,8 @@ export function editorExtensions({
   plainText,
   readOnly,
   onSave,
+  draft = false,
+  rename = null,
 }: EditorOptions): Extension[] {
   return [
     history(),
@@ -77,7 +83,7 @@ export function editorExtensions({
       indentWithTab,
     ]),
     editorTheme,
-    documentTitle(title),
+    titleCompartment.of(documentTitle(title, draft, readOnly ? null : rename)),
     documentSource.of({ baseId, path }),
     ...(plainText
       ? [EditorView.theme({ '.cm-content': { fontFamily: 'var(--font-mono)' } })]
