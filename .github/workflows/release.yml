@@ -74,6 +74,21 @@ jobs:
 
       - run: npm ci
 
+      # Without this the macOS bundle ships with no `_CodeSignature` at all:
+      # only the binary carries the linker's ad-hoc signature, and the bundle
+      # around it carries none. `codesign --verify` then fails outright, and
+      # the Mac that opens it is told the app is damaged and should go to the
+      # Trash, with no way past it. Signing the whole bundle ad-hoc makes the
+      # signature valid, which downgrades that to the ordinary warning about
+      # an unidentified developer, the one with "Open Anyway" behind it.
+      #
+      # This is not notarisation and does not pretend to be. With an Apple
+      # Developer ID in the secrets, tauri-action signs and notarises instead,
+      # and this step has nothing left to repair.
+      - name: Assina o bundle do macOS
+        if: startsWith(matrix.platform, 'macos')
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
