@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import type { Side } from './dock-layout'
 
 export type BodyFont = 'sans' | 'serif' | 'mono'
 export type ThemeMode = 'system' | 'light' | 'dark'
@@ -35,6 +36,12 @@ export interface Settings {
   readOnly: boolean
   /** Whether a pause in the typing writes the file by itself. */
   autosave: boolean
+  /** Whether the pinned notes sit on the edge of the screen. */
+  dock: boolean
+  /** Which edge they sit on. */
+  dockSide: Side
+  /** Whether the dock rolls up to a rail when the pointer is elsewhere. */
+  dockCollapse: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -54,6 +61,13 @@ export const DEFAULTS: Settings = {
   // somebody's back is the kind of help that is only welcome when it was asked
   // for.
   autosave: false,
+  // On, but empty: with nothing pinned the dock is a rail the width of a
+  // scrollbar, and it is the only thing that shows the feature exists.
+  dock: true,
+  // The right, because that is where the scrollbar already is and where the
+  // text is not.
+  dockSide: 'right',
+  dockCollapse: true,
 }
 
 export const LIMITS = {
@@ -79,7 +93,16 @@ export const FONT_LABELS: Record<BodyFont, string> = {
 
 const STORAGE_KEY = 'markdown-viewer.settings'
 
-function load(): Settings {
+/**
+ * The settings as they are on disk.
+ *
+ * Exported because the two panels need to paint themselves with the same
+ * numbers as the app without joining in the writing of them: they read, they
+ * apply, and they never store. Storage is shared between the windows, so a
+ * panel that wrote back a copy it read a minute ago would quietly undo a
+ * setting somebody had just changed in the app.
+ */
+export function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (!stored) return DEFAULTS
@@ -91,7 +114,7 @@ function load(): Settings {
   }
 }
 
-function apply(settings: Settings): void {
+export function applySettings(settings: Settings): void {
   const root = document.documentElement.style
   root.setProperty('--measure', settings.measurePx + 'px')
   root.setProperty('--ui-scale', String(settings.uiScale))
@@ -104,10 +127,10 @@ function apply(settings: Settings): void {
 }
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings>(load)
+  const [settings, setSettings] = useState<Settings>(loadSettings)
 
   useEffect(() => {
-    apply(settings)
+    applySettings(settings)
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     } catch {

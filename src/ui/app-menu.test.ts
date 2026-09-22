@@ -59,6 +59,7 @@ describe('o menu do sistema', () => {
       'Abrir pasta',
       'Abrir recentes',
       'Salvar',
+      'Fixar na barra de notas',
       'Imprimir',
       'Fechar aba',
       'Reabrir aba fechada',

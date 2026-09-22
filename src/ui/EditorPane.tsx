@@ -27,6 +27,12 @@ interface Props {
   onOutline: (headings: Heading[]) => void
   /** Hands the live editor out, so the panel can scroll it. */
   onReady: (view: EditorView | null) => void
+  /**
+   * Whether the cursor lands here as soon as the editor is built. True in the
+   * app, where opening a file is a request to write in it. False in the note
+   * that floats out on hover, which nobody asked to type in yet.
+   */
+  autoFocus?: boolean
 }
 
 export function EditorPane({
@@ -39,6 +45,7 @@ export function EditorPane({
   onSave,
   onOutline,
   onReady,
+  autoFocus = true,
 }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
@@ -84,7 +91,7 @@ export function EditorPane({
       parent,
     })
     view.current = instance
-    instance.focus()
+    if (autoFocus) instance.focus()
 
     // A handle for measuring in the browser console during development.
     if (import.meta.env.DEV) (window as unknown as { cm?: EditorView }).cm = instance

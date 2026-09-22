@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { EDITOR_BINDINGS, SHORTCUTS, editorCap, keyCap, onApple } from './shortcuts'
 import { FONT_LABELS, LIMITS, type BodyFont, type Settings, type ThemeMode } from '~/app/settings'
+import type { Side } from '~/app/dock-layout'
 import { ChevronIcon, CloseIcon, GripIcon } from './icons'
 
 const POSITION_KEY = 'markdown-viewer.settings.position'
@@ -179,6 +180,45 @@ export function SettingsWindow({ settings, update, reset, onClose, onMeasureFocu
           ]}
           onChange={(value) => update('themeMode', value)}
         />
+
+        <div className="settings-divider" />
+        <p className="section-label">Notas fixadas</p>
+
+        <button
+          type="button"
+          className="settings-row is-clickable"
+          aria-pressed={settings.dock}
+          onClick={() => update('dock', !settings.dock)}
+        >
+          <span className="settings-label">Barra na borda</span>
+          <span className="switch" data-on={settings.dock} />
+        </button>
+
+        <Segmented
+          label="Lado"
+          value={settings.dockSide}
+          options={[
+            { value: 'left' as Side, label: 'Esquerda' },
+            { value: 'right' as Side, label: 'Direita' },
+          ]}
+          onChange={(value) => update('dockSide', value)}
+        />
+
+        <button
+          type="button"
+          className="settings-row is-clickable"
+          aria-pressed={settings.dockCollapse}
+          disabled={!settings.dock}
+          onClick={() => update('dockCollapse', !settings.dockCollapse)}
+        >
+          <span className="settings-label">Encolher sozinha</span>
+          <span className="switch" data-on={settings.dockCollapse} />
+        </button>
+
+        <p className="settings-note">
+          A barra fica por cima dos outros apps. Fechar a janela do app deixa ela lá, e o ícone ao
+          lado do relógio traz o app de volta ou encerra tudo.
+        </p>
 
         <div className="settings-divider" />
         <p className="section-label">Árvore</p>

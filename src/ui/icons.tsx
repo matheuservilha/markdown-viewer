@@ -218,3 +218,44 @@ export const ThemeIcon = ({ size = 16 }: IconProps) => (
     </g>
   </svg>
 )
+
+/** The pin, at the angle a real one goes into a wall. */
+export const PinIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 4h6M10.2 4v5.2L7.5 13h9l-2.7-3.8V4M12 13v7" />
+  </Icon>
+)
+
+/** The same pin with a stroke through it: what the click will undo. */
+export const UnpinIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 4h6M10.2 4v5.2L7.5 13h9l-2.7-3.8V4M12 13v7" />
+    <path d="M4 4l16 16" />
+  </Icon>
+)
+
+export const PlusIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 5.5v13M5.5 12h13" />
+  </Icon>
+)
+
+/** Out of the panel and into the app: an arrow leaving its frame. */
+export const OpenInAppIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M13.5 4.5H19.5V10.5M19.5 4.5 12 12" />
+    <path d="M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+  </Icon>
+)
+
+/** Two columns of dots: what a row is dragged by. */
+export const DragDotsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="9.5" cy="6" r="1.05" />
+    <circle cx="14.5" cy="6" r="1.05" />
+    <circle cx="9.5" cy="12" r="1.05" />
+    <circle cx="14.5" cy="12" r="1.05" />
+    <circle cx="9.5" cy="18" r="1.05" />
+    <circle cx="14.5" cy="18" r="1.05" />
+  </Icon>
+)
