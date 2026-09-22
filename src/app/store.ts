@@ -13,6 +13,7 @@ import {
   type Recents,
 } from './recents'
 import { byDepth, restoreMayChooseActive, type Session, type SessionTab } from './session'
+import { DRAFT_BASE, isDraft, nextDraftName, type Draft } from './drafts'
 import {
   baseName,
   entryId,
@@ -22,8 +23,12 @@ import {
   type Base,
   type Entry,
   type FileVersion,
+  nativeBaseName,
 } from '~/platform/fs'
 import { encode, type TextShape } from '~/platform/text'
+
+/** The shape a note is born with: plain UTF-8, newline endings, no BOM. */
+const DRAFT_SHAPE: TextShape = { eol: '\n', bom: false, encoding: 'utf-8', lossy: false }
 
 export interface Tab {
   /** Same as the entry id, so a file is never open twice. */
@@ -390,11 +395,85 @@ export function useWorkspace() {
     [report],
   )
 
+  /**
+   * Opening a recent file is defined further down, and saving a draft needs
+   * it, so it is reached through a reference rather than by moving either one.
+   */
+  const openRecent = useRef<((file: RecentFile) => Promise<void>) | null>(null)
+
+  /**
+   * Opens a note that exists only in the app.
+   *
+   * No dialog, no file, nothing on disk. It becomes a file the first time it
+   * is saved, and only then is the person asked where it goes.
+   */
+  const newNote = useCallback((restoring?: Draft) => {
+    const taken = latest.current.tabs.map((tab) => tab.name)
+    const draft: Draft = restoring ?? {
+      id: String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8),
+      name: nextDraftName(taken),
+      text: '',
+      at: Date.now(),
+    }
+    const id = entryId(DRAFT_BASE, draft.id)
+    dispatch({
+      type: 'tab/opened',
+      tab: { id, baseId: DRAFT_BASE, path: draft.id, name: draft.name, preview: false },
+    })
+    dispatch({
+      type: 'doc/loaded',
+      id,
+      doc: {
+        text: draft.text,
+        shape: DRAFT_SHAPE,
+        version: { size: 0, modifiedAt: 0 },
+        // Never clean: a draft is unsaved by definition, and the dot on the
+        // tab is what says so.
+        dirty: true,
+        conflict: false,
+        gone: false,
+      },
+    })
+    return id
+  }, [])
+
+  /**
+   * Saving a draft is the moment it stops being one: the person says where it
+   * goes, the bytes are written there, and the tab is replaced by the file.
+   */
+  const saveDraftAs = useCallback(
+    async (id: string) => {
+      const tab = latest.current.tabs.find((candidate) => candidate.id === id)
+      const doc = latest.current.docs[id]
+      if (!tab || !doc) return
+      try {
+        const suggested = tab.name.endsWith('.md') ? tab.name : tab.name + '.md'
+        const target = await fileSystem().saveAs(suggested, encode(doc.text, doc.shape))
+        if (!target) return
+        dispatch({ type: 'tab/closed', id })
+        await openRecent.current?.({
+          baseId: target,
+          path: '',
+          name: nativeBaseName(target),
+          label: target,
+          at: Date.now(),
+        })
+      } catch (error) {
+        report(error)
+      }
+    },
+    [report],
+  )
+
   const save = useCallback(
     async (id: string) => {
       const tab = latest.current.tabs.find((candidate) => candidate.id === id)
       const doc = latest.current.docs[id]
       if (!tab || !doc || !doc.dirty) return
+      if (isDraft(tab)) {
+        await saveDraftAs(id)
+        return
+      }
       if (doc.shape.lossy) {
         report(
           new Error(
@@ -415,7 +494,7 @@ export function useWorkspace() {
         report(error)
       }
     },
-    [report],
+    [report, saveDraftAs],
   )
 
   /** Pulls the file from disk again, throwing away what is in the editor. */
@@ -767,12 +846,19 @@ export function useWorkspace() {
     [loadChildren],
   )
 
+  // Kept up to date rather than reordered, because moving either function
+  // would drag half the file with it.
+  useEffect(() => {
+    openRecent.current = openRecentFile
+  }, [openRecentFile])
+
   const actions = useMemo(
     () => ({
       openBase,
       openLooseFile,
       openRecentFile,
       openRecentBase,
+      newNote,
       forgetRecents,
       forgetRecentFile,
       forgetRecentBase,
@@ -803,6 +889,7 @@ export function useWorkspace() {
       checkExternalChanges,
       collapseAll,
       createEntry,
+      newNote,
       forgetRecents,
       forgetRecentFile,
       forgetRecentBase,

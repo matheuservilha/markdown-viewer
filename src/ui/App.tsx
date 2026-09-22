@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { loadSession, saveSession, type Session, type ViewState } from '~/app/session'
+import {
+  loadSession,
+  saveSession,
+  type Session,
+  type SessionTab,
+  type ViewState,
+} from '~/app/session'
+import { isDraft, loadDrafts, saveDrafts } from '~/app/drafts'
 import { DEFAULTS, LIMITS, useSettings } from '~/app/settings'
 import { useWorkspace, type Doc, type Tab } from '~/app/store'
 import { entryId, nativeBaseName, parentPath, type Entry } from '~/platform/fs'
-import { noteHome } from '~/app/new-note'
 import type { Heading } from '~/editor/outline'
 import { EditorView, type Command } from '@codemirror/view'
 import { redo, undo } from '@codemirror/commands'
@@ -55,6 +61,23 @@ import {
   ThemeIcon,
 } from './icons'
 import { useResolvedTheme } from './useTheme'
+
+/**
+ * A tab as the session remembers it. The optional halves are set rather than
+ * spread so the shape is written in one place and read in one pass.
+ */
+function toSessionTab(tab: Tab, view: ViewState | undefined): SessionTab {
+  const kept: SessionTab = {
+    id: tab.id,
+    baseId: tab.baseId,
+    path: tab.path,
+    name: tab.name,
+    preview: tab.preview,
+  }
+  if (tab.label !== undefined) kept.label = tab.label
+  if (view) kept.view = view
+  return kept
+}
 
 /** How long the typing has to stop before the file is written. */
 const AUTOSAVE_DELAY = 1500
@@ -112,27 +135,6 @@ export function App() {
     },
     [actions],
   )
-
-  /**
-   * A new note, wherever it can go. Inside the folder the person is working
-   * in, and when no folder is open at all, wherever the system dialog says.
-   */
-  const newNote = useCallback(async () => {
-    const home = noteHome(state.bases, state.tabs, state.activeId)
-    if (home) {
-      await createIn(home.baseId, home.parent, 'file')
-      return
-    }
-    const target = await fileSystem().saveAs('Sem título.md', new Uint8Array())
-    if (!target) return
-    await actions.openRecentFile({
-      baseId: target,
-      path: '',
-      name: nativeBaseName(target),
-      label: target,
-      at: Date.now(),
-    })
-  }, [actions, createIn, state.activeId, state.bases, state.tabs])
 
   const menuItems = useCallback(
     (entry: Entry): MenuItem[] => {
@@ -319,6 +321,10 @@ export function App() {
     if (restoreStarted.current) return
     restoreStarted.current = true
 
+    // The drafts come back first, and on their own: they have nothing on disk
+    // to reopen, so they do not depend on any folder still being reachable.
+    for (const draft of loadDrafts()) actions.newNote(draft)
+
     const session = loadSession()
     if (!session) return
     previous.current = session
@@ -326,6 +332,8 @@ export function App() {
       session.tabs.flatMap((tab) => (tab.view ? [[tab.id, tab.view]] : [])),
     )
     void restore(session, false)
+    // `actions` is stable and asking for it here would re-run the restore.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restore])
 
   /**
@@ -354,20 +362,35 @@ export function App() {
       expanded: [...heldFolders, ...Object.keys(state.expanded).filter((id) => state.expanded[id])],
       tabs: [
         ...heldTabs,
-        ...state.tabs.map((tab) => ({
-          id: tab.id,
-          baseId: tab.baseId,
-          path: tab.path,
-          name: tab.name,
-          preview: tab.preview,
-          ...(tab.label === undefined ? {} : { label: tab.label }),
-          ...(views.current[tab.id] ? { view: views.current[tab.id] } : {}),
-        })),
+        // A draft has nothing on disk to reopen, so it travels in its own
+        // store and not in the list of files to read back.
+        ...state.tabs
+          .filter((tab) => !isDraft(tab))
+          .map((tab) => toSessionTab(tab, views.current[tab.id])),
       ],
       activeId: state.activeId ?? kept?.activeId ?? null,
       sidebarOpen,
     })
-  }, [state.bases, state.tabs, state.expanded, state.activeId, state.pending, sidebarOpen])
+
+    // The drafts themselves, text and all, because there is nowhere else they
+    // could be read back from.
+    saveDrafts(
+      state.tabs.filter(isDraft).map((tab) => ({
+        id: tab.path,
+        name: tab.name,
+        text: state.docs[tab.id]?.text ?? '',
+        at: Date.now(),
+      })),
+    )
+  }, [
+    state.bases,
+    state.tabs,
+    state.docs,
+    state.expanded,
+    state.activeId,
+    state.pending,
+    sidebarOpen,
+  ])
 
   // Writing the session costs a few hundred bytes of ids and paths, so it is
   // written on every change rather than on the way out.
@@ -617,7 +640,7 @@ export function App() {
             if (activeId) void actions.save(activeId)
             break
           case 'newFile':
-            void newNote()
+            actions.newNote()
             break
           case 'openBase':
             void actions.openBase()
@@ -665,18 +688,7 @@ export function App() {
         }
       })
     },
-    [
-      actions,
-      closeTab,
-      newNote,
-      documentMenu,
-      once,
-      reopenTab,
-      settings.infoPanel,
-      stepTab,
-      update,
-      zoom,
-    ],
+    [actions, closeTab, documentMenu, once, reopenTab, settings.infoPanel, stepTab, update, zoom],
   )
 
   useEffect(() => {
@@ -756,7 +768,7 @@ export function App() {
         </div>
 
         <div className="nav-actions">
-          <button type="button" className="nav-action" onClick={() => void newNote()}>
+          <button type="button" className="nav-action" onClick={() => actions.newNote()}>
             <FilePlusIcon />
             Nova nota
           </button>
