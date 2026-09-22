@@ -2022,6 +2022,22 @@ html[data-window='peek'] body {
 }
 
 /*
+ * The pointer keeps its ordinary arrow over the whole column.
+ *
+ * A tab is something the pointer passes over on its way somewhere else, not a
+ * link. Turning the arrow into a hand every time somebody crosses the edge of
+ * the screen makes the edge of the screen feel like a control panel, which is
+ * the opposite of what it is for. It stays the arrow even on the tabs, and
+ * what a click does is said in words on the note that floats out.
+ */
+html[data-window='dock'],
+html[data-window='dock'] body,
+html[data-window='dock'] .chip {
+  cursor: default;
+  user-select: none;
+}
+
+/*
  * The easing everything on the edge of the screen moves with: fast out of the
  * gate and slightly past its mark before settling. A square that slides
  * linearly to meet the pointer reads as a panel opening; one that overshoots a
@@ -2065,7 +2081,6 @@ html[data-window='peek'] body {
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
 
   /* Each tab comes in from behind the edge of the screen, one after the other,
      so a column that just gained a note grows rather than blinks. */
@@ -2099,6 +2114,9 @@ html[data-window='peek'] body {
   position: absolute;
   top: 0;
   bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 16px;
   background: linear-gradient(150deg, color-mix(in oklab, var(--pin) 86%, white), var(--pin));
   box-shadow:
@@ -2139,11 +2157,13 @@ html[data-window='peek'] body {
     0 0 0 4px var(--pin);
 }
 
-/* A note with something unwritten in it wears a notch on its inner edge, where
-   there is always something to see however narrow the tab is. */
+/*
+ * A note with something unwritten in it wears a dot. It sits in the middle of
+ * the face rather than at a fixed distance from the edge of the window, so it
+ * travels with the tab as the tab grows instead of standing still while the
+ * colour slides out from under it.
+ */
 .chip-mark {
-  position: absolute;
-  top: 50%;
   width: 5px;
   height: 5px;
   border-radius: 999px;
@@ -2151,16 +2171,6 @@ html[data-window='peek'] body {
   box-shadow: 0 0 0 1.5px rgb(0 0 0 / 20%);
   opacity: 0;
   transition: opacity 160ms var(--spring);
-}
-
-.dock[data-side='right'] .chip-mark {
-  right: 5px;
-  transform: translateY(-50%);
-}
-
-.dock[data-side='left'] .chip-mark {
-  left: 5px;
-  transform: translateY(-50%);
 }
 
 .chip.is-dirty .chip-mark {
@@ -2173,52 +2183,46 @@ html[data-window='peek'] body {
  * It wears the colour the next note will be born with, so the tab says what it
  * is about to make. Hollow until the pointer arrives, so a column of five
  * notes plus this one still reads as five notes.
+ *
+ * The outline is a real border and not a ring, so the side that runs off the
+ * monitor can be left undrawn. A ring would draw a line down the edge of the
+ * screen and give the tab an outside it is not supposed to have.
  */
 .chip.is-new .chip-face {
+  border: 1.5px solid color-mix(in oklab, var(--pin) 50%, transparent);
   background: color-mix(in oklab, var(--pin) 20%, transparent);
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--pin) 50%, transparent);
+  box-shadow: none;
+}
+
+.dock[data-side='right'] .chip.is-new .chip-face {
+  border-right: 0;
+}
+
+.dock[data-side='left'] .chip.is-new .chip-face {
+  border-left: 0;
 }
 
 .chip.is-new.is-near .chip-face {
+  border-color: transparent;
   background: linear-gradient(150deg, color-mix(in oklab, var(--pin) 86%, white), var(--pin));
   box-shadow:
     0 2px 5px rgb(0 0 0 / 30%),
     0 12px 26px rgb(0 0 0 / 26%);
 }
 
+/* Centred in the face like the dot, and for the same reason: it belongs to the
+   tab, not to the window the tab is drawn in. */
 .chip-plus {
-  position: absolute;
-  top: 50%;
+  flex: 0 0 auto;
   color: var(--pin);
   transition:
     color 200ms var(--spring),
-    transform 320ms var(--spring),
-    right 200ms var(--spring),
-    left 200ms var(--spring);
-}
-
-.dock[data-side='right'] .chip-plus {
-  right: 2px;
-  transform: translateY(-50%);
-}
-
-.dock[data-side='left'] .chip-plus {
-  left: 2px;
-  transform: translateY(-50%);
-}
-
-.dock[data-side='right'] .chip.is-new.is-near .chip-plus {
-  right: 8px;
-  transform: translateY(-50%) rotate(90deg);
-}
-
-.dock[data-side='left'] .chip.is-new.is-near .chip-plus {
-  left: 8px;
-  transform: translateY(-50%) rotate(90deg);
+    transform 320ms var(--spring);
 }
 
 .chip.is-new.is-near .chip-plus {
   color: #fff;
+  transform: rotate(90deg);
 }
 
 /* ------------------------------------------------------- a nota que flutua */

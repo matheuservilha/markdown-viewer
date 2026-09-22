@@ -113,8 +113,9 @@ export function Dock() {
             onPointerLeave={leaveChip}
             onClick={() => send('note:open-in-app', { id: pin.id })}
           >
-            <span className="chip-face" />
-            <span className="chip-mark" aria-hidden="true" />
+            <span className="chip-face">
+              <span className="chip-mark" aria-hidden="true" />
+            </span>
           </button>
         ))}
 
@@ -138,8 +139,9 @@ export function Dock() {
           onPointerLeave={leaveChip}
           onClick={addNote}
         >
-          <span className="chip-face" />
-          <PlusIcon size={15} className="chip-plus" />
+          <span className="chip-face">
+            <PlusIcon size={14} className="chip-plus" />
+          </span>
         </button>
       </div>
     </div>
