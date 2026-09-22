@@ -3,6 +3,8 @@ import { fileSystem } from '~/platform'
 import { buildIndex, EMPTY_INDEX, type BaseIndex } from './base-index'
 import {
   clearRecents,
+  forgetBase,
+  forgetFile,
   loadRecents,
   rememberBase,
   rememberFile,
@@ -671,6 +673,17 @@ export function useWorkspace() {
     [],
   )
 
+  const forgetRecentFile = useCallback(
+    (baseId: string, path: string) =>
+      dispatch({ type: 'recents/set', recents: forgetFile(baseId, path) }),
+    [],
+  )
+
+  const forgetRecentBase = useCallback(
+    (id: string) => dispatch({ type: 'recents/set', recents: forgetBase(id) }),
+    [],
+  )
+
   const expandFolder = useCallback(
     async (baseId: string, path: string) => {
       dispatch({ type: 'folder/expanded', id: entryId(baseId, path) })
@@ -761,6 +774,8 @@ export function useWorkspace() {
       openRecentFile,
       openRecentBase,
       forgetRecents,
+      forgetRecentFile,
+      forgetRecentBase,
       restoreSession,
       createEntry,
       renameEntry,
@@ -789,6 +804,8 @@ export function useWorkspace() {
       collapseAll,
       createEntry,
       forgetRecents,
+      forgetRecentFile,
+      forgetRecentBase,
       indexBase,
       expandFolder,
       revealPath,

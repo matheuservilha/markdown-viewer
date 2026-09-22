@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import type { RecentBase, RecentFile, Recents as RecentsData } from '~/app/recents'
 import { isPlainText, isTextFile } from '~/platform/fs'
-import { ChevronIcon, FileIcon, FolderIcon, MarkdownIcon } from './icons'
+import { ChevronIcon, CloseIcon, FileIcon, FolderIcon, MarkdownIcon } from './icons'
 
 /** How much history is worth showing. Older than this is noise. */
 const LIMIT = 8
@@ -14,6 +14,8 @@ interface Props {
   onToggle: () => void
   onOpenFile: (file: RecentFile) => void
   onOpenBase: (base: RecentBase) => void
+  onForgetFile: (file: RecentFile) => void
+  onForgetBase: (base: RecentBase) => void
   onClear: () => void
 }
 
@@ -30,6 +32,8 @@ export const Recents = memo(function Recents({
   onToggle,
   onOpenFile,
   onOpenBase,
+  onForgetFile,
+  onForgetBase,
   onClear,
 }: Props) {
   const folders = recents.bases.filter((base) => !openBases.includes(base.id))
@@ -47,7 +51,7 @@ export const Recents = memo(function Recents({
       {open && (
         <ul className="tree recents-list" role="group">
           {folders.map((base) => (
-            <li key={base.id}>
+            <li key={base.id} className="recents-item">
               <button
                 type="button"
                 className="tree-row"
@@ -57,11 +61,20 @@ export const Recents = memo(function Recents({
                 <FolderIcon size={15} className="tree-icon is-folder" />
                 <span className="tree-name">{base.name}</span>
               </button>
+              <button
+                type="button"
+                className="recents-forget"
+                aria-label={'Tirar ' + base.name + ' do histórico'}
+                title="Tirar do histórico"
+                onClick={() => onForgetBase(base)}
+              >
+                <CloseIcon size={12} />
+              </button>
             </li>
           ))}
 
           {files.map((file) => (
-            <li key={file.baseId + ':' + file.path}>
+            <li key={file.baseId + ':' + file.path} className="recents-item">
               <button
                 type="button"
                 className="tree-row"
@@ -70,6 +83,15 @@ export const Recents = memo(function Recents({
               >
                 <FileMark name={file.name} />
                 <span className="tree-name">{file.name}</span>
+              </button>
+              <button
+                type="button"
+                className="recents-forget"
+                aria-label={'Tirar ' + file.name + ' do histórico'}
+                title="Tirar do histórico"
+                onClick={() => onForgetFile(file)}
+              >
+                <CloseIcon size={12} />
               </button>
             </li>
           ))}

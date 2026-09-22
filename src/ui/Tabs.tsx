@@ -32,6 +32,17 @@ export const Tabs = memo(function Tabs({ state, onActivate, onPin, onClose }: Pr
             title={tab.label ?? tab.path}
             onClick={() => onActivate(tab.id)}
             onDoubleClick={() => onPin(tab.id)}
+            // The middle button closes the tab, the way it does in a browser.
+            // The press is caught as well as the release, because otherwise
+            // the system starts its own scroll gesture on the way down.
+            onMouseDown={(event) => {
+              if (event.button === 1) event.preventDefault()
+            }}
+            onAuxClick={(event) => {
+              if (event.button !== 1) return
+              event.preventDefault()
+              onClose(tab.id)
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') onActivate(tab.id)
             }}
