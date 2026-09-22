@@ -1,5 +1,5 @@
 /**
- * Where the panels go on the screen.
+ * Where the squares and the note go on the screen.
  *
  * All of it is arithmetic over a rectangle, on purpose. The screen, the
  * monitor and the window system stay on the other side of this file, so the
@@ -27,63 +27,102 @@ export interface Rect {
   height: number
 }
 
-/** The strip left on the edge when the pointer is elsewhere. */
-export const RAIL_WIDTH = 13
-/** The dock with its list of notes open. */
-export const DOCK_WIDTH = 232
-export const DOCK_MIN_HEIGHT = 96
+/** The side of one square. */
+export const SQUARE = 26
+/** Air between two squares. */
+export const SQUARE_GAP = 9
+/** Air above the first square and below the last. */
+export const COLUMN_PAD = 8
 /**
- * How much of the screen's height the dock may take. A dock as tall as the
- * screen stops reading as a panel and starts reading as a second window.
+ * How far a square is inset from the edge of the screen, and therefore how
+ * much room is left on the other side of the window for it to lean out into
+ * when the pointer arrives.
  */
-const DOCK_MAX_FILL = 0.82
+export const SQUARE_INSET = 5
+export const LEAN = 9
+/** The window that holds the column: one square wide, plus room to lean. */
+export const DOCK_WIDTH = SQUARE + SQUARE_INSET + LEAN
 
 export const PEEK_WIDTH = 392
 export const PEEK_MIN_HEIGHT = 220
 export const PEEK_MAX_HEIGHT = 620
-/**
- * Breathing room between the note and the edges of the screen.
- *
- * It is never applied between the note and the list. The pointer travels from
- * one to the other, and a strip of desktop in between is a strip where the
- * pointer is on neither of them.
- */
+/** Air between the note and the squares, and between the note and the screen. */
+const GAP = 8
 const MARGIN = 10
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
+/** How tall a column of `count` squares is, with its air. */
+export function columnHeight(count: number): number {
+  const squares = Math.max(count, 1)
+  return COLUMN_PAD * 2 + squares * SQUARE + (squares - 1) * SQUARE_GAP
+}
+
 /**
- * The dock: flush against its edge, centred on the height of the screen.
+ * The window that holds the squares: flush against its edge, centred on the
+ * height of the screen.
  *
  * It sits on the edge rather than near it because the edge is the one place a
  * pointer can reach without aiming. Throwing the mouse at the side of the
- * screen lands on the dock every time.
+ * screen lands on the column every time.
+ *
+ * `count` is the number of squares, the notes plus the one that writes a new
+ * one, so the window is exactly as tall as what is in it and no taller. A
+ * transparent window that is bigger than its contents is a piece of screen
+ * that silently swallows clicks.
  */
-export function dockRect(area: Area, side: Side, expanded: boolean, contentHeight: number): Rect {
-  const width = expanded ? DOCK_WIDTH : RAIL_WIDTH
-  const ceiling = Math.max(DOCK_MIN_HEIGHT, Math.round(area.height * DOCK_MAX_FILL))
-  const height = clamp(Math.round(contentHeight), DOCK_MIN_HEIGHT, ceiling)
-
+export function dockRect(area: Area, side: Side, count: number): Rect {
+  const height = Math.min(columnHeight(count), area.height)
   return {
-    x: side === 'right' ? area.x + area.width - width : area.x,
-    // Centred, but never above the top of the work area: a screen shorter
-    // than the dock's own minimum would otherwise push its head under the
-    // menu bar.
+    x: side === 'right' ? area.x + area.width - DOCK_WIDTH : area.x,
     y: Math.max(area.y, area.y + Math.round((area.height - height) / 2)),
-    width,
+    width: DOCK_WIDTH,
     height,
   }
 }
 
 /**
- * The note that floats beside the dock.
+ * One square, on the screen.
  *
- * It opens against the inner face of the dock, level with the row the pointer
- * is on, so the note appears to come out of the row it belongs to. Where there
- * is no room on that side, which happens on a narrow screen, it goes to the
- * other side of the dock rather than off the screen.
+ * The app's window needs this to tell whether the pointer is still on the
+ * square whose note is showing. The square itself knows where it is, but it
+ * cannot be asked: a window that is always on top and was never clicked is not
+ * the active window, and is not reliably told that the pointer left it.
+ */
+export function squareRect(dock: Rect, side: Side, index: number): Rect {
+  return {
+    x: side === 'right' ? dock.x + LEAN : dock.x + SQUARE_INSET,
+    y: dock.y + COLUMN_PAD + index * (SQUARE + SQUARE_GAP),
+    width: SQUARE,
+    height: SQUARE,
+  }
+}
+
+/**
+ * Whether a point is on a rectangle.
+ *
+ * The slack matters because the pointer is read a few times a second rather
+ * than followed: between two readings it can be a pixel outside a square it is
+ * sitting still on, while the square leans out to meet it.
+ */
+export function within(rect: Rect, x: number, y: number, slack = 0): boolean {
+  return (
+    x >= rect.x - slack &&
+    x <= rect.x + rect.width + slack &&
+    y >= rect.y - slack &&
+    y <= rect.y + rect.height + slack
+  )
+}
+
+/**
+ * The note that floats out beside a square.
+ *
+ * It opens on the inner side of the column, level with the square it belongs
+ * to, so it reads as coming out of that square. Where there is no room on that
+ * side, which happens on a narrow screen, it goes to the other side rather
+ * than off the edge.
  */
 export function peekRect(
   area: Area,
@@ -95,8 +134,8 @@ export function peekRect(
   const height = clamp(Math.round(contentHeight), PEEK_MIN_HEIGHT, maxPeekHeight(area))
   const width = Math.min(PEEK_WIDTH, Math.max(240, area.width - dock.width - MARGIN * 2))
 
-  const inner = side === 'right' ? dock.x - width : dock.x + dock.width
-  const outer = side === 'right' ? dock.x + dock.width : dock.x - width
+  const inner = side === 'right' ? dock.x - width - GAP : dock.x + dock.width + GAP
+  const outer = side === 'right' ? dock.x + dock.width + GAP : dock.x - width - GAP
 
   const fits = (x: number) => x >= area.x && x + width <= area.x + area.width
   const x = fits(inner) ? inner : fits(outer) ? outer : clampX(area, width)
@@ -109,23 +148,6 @@ export function peekRect(
     width,
     height,
   }
-}
-
-/**
- * Whether a point is on a panel.
- *
- * The slack is what makes the trip from the list to the note survive: the
- * pointer is read a few times a second, so between two readings it can be on
- * the seam between the two windows, or a pixel past an edge it is heading
- * back into.
- */
-export function within(rect: Rect, x: number, y: number, slack = 0): boolean {
-  return (
-    x >= rect.x - slack &&
-    x <= rect.x + rect.width + slack &&
-    y >= rect.y - slack &&
-    y <= rect.y + rect.height + slack
-  )
 }
 
 export function maxPeekHeight(area: Area): number {

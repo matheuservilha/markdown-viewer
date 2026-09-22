@@ -1,327 +1,145 @@
 /**
- * The dock: the pinned notes, on the edge of the screen, over everything.
+ * The squares on the edge of the screen.
  *
- * It owns nothing. The list, the colours and the order all arrive from the
- * app's window, and everything the pointer does here leaves as a message. What
- * this file decides is only what a panel on the edge of a screen has to decide
- * for itself: how tall it wants to be, and whether it is rolled up.
+ * One per pinned note, in its colour, plus one at the bottom that writes a new
+ * one. That is the whole of it: there is no list, nothing opens, nothing is
+ * fixed. The pointer rests on a square and the note floats out to be read; the
+ * pointer leaves and it is gone.
+ *
+ * It owns nothing. The notes and the colours arrive from the app's window, and
+ * everything the pointer does here leaves as a message.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react'
-import { DOCK_WIDTH, RAIL_WIDTH } from '~/app/dock-layout'
-import { PIN_COLORS, pinTitle, type Pin, type PinColor } from '~/app/pinned'
+import { useEffect, useRef, useState } from 'react'
+import { pinTitle, type Pin } from '~/app/pinned'
 import { on, send, type DockState } from '~/platform/channel'
-import { showMainWindow } from '~/platform/panels'
-import { BrandMark, OpenInAppIcon, MoreIcon, PlusIcon, UnpinIcon } from './icons'
+import { PlusIcon } from './icons'
 
 /**
- * How long the pointer has to rest on the edge before the list opens.
+ * How long the pointer has to rest on a square before its note floats out.
  *
- * Long enough that crossing the edge of the screen on the way to something
- * else does not throw the list open, and short enough that reaching for the
- * list does not feel like waiting for it. Under about 30ms the first is lost;
- * over about 120ms the second is.
+ * Long enough that running the pointer down the column does not fire off four
+ * notes on the way past, short enough that stopping on one does not feel like
+ * waiting.
  */
-const EXPAND_DELAY = 45
-/** How long the pointer has to rest on a row before its note floats out. */
-const PEEK_DELAY = 110
+const PEEK_DELAY = 95
 
 const EMPTY: DockState = {
   pins: [],
   side: 'right',
-  autoCollapse: true,
   theme: 'dark',
   dirty: [],
-  stuck: null,
+  nextColor: 'ambar',
 }
 
 export function Dock() {
   const [state, setState] = useState<DockState>(EMPTY)
-  /** Whether the pointer has asked for the list. Not the same as showing it. */
-  const [reaching, setReaching] = useState(false)
-  const [rowMenu, setRowMenu] = useState<string | null>(null)
-  const card = useRef<HTMLDivElement>(null)
-  /** The wait before the list opens, and the wait before a note floats out. */
+  /** Which square the pointer is on, so it can lean out to meet it. */
+  const [near, setNear] = useState<number | null>(null)
   const timer = useRef(0)
-  const hover = useRef(0)
 
-  /**
-   * Whether the list is open, which is three things at once: the pointer is
-   * here, a note is fixed open beside a row, or rolling up was turned off.
-   * Working it out while rendering rather than storing it is what keeps those
-   * three from arguing.
-   */
-  const expanded = reaching || state.stuck !== null || !state.autoCollapse
-  /** A note that goes away takes its open row with it. */
-  const openRow = state.pins.some((pin) => pin.id === rowMenu) ? rowMenu : null
-
-  // The app's window may have been running for hours before this panel opened,
-  // so the panel asks rather than waiting to be told.
+  // The app's window may have been running for hours before this one opened,
+  // so it asks rather than waiting to be told.
   useEffect(() => {
-    const stops = [
-      on('dock:state', setState),
-      // The app's window is what notices the pointer leaving, because this one
-      // cannot: a panel that is always on top and was never clicked is not the
-      // active window, and is not reliably told that the pointer went away.
-      on('dock:away', () => {
-        window.clearTimeout(timer.current)
-        window.clearTimeout(hover.current)
-        setReaching(false)
-        setRowMenu(null)
-      }),
-    ]
+    const stop = on('dock:state', setState)
     send('panel:hello', { role: 'dock' })
-    return () => {
-      for (const stop of stops) stop()
-    }
+    return stop
   }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = state.theme
   }, [state.theme])
 
-  /**
-   * How tall the dock wants to be. It is measured rather than counted, so a
-   * name that wraps to two lines is a row that is two lines tall and a dock
-   * that is that much taller.
-   *
-   * What is measured is a box that is never stretched to the window, which is
-   * what keeps this from chasing its own tail: the app's window is free to
-   * give us less height than we asked for, and a box that had been stretched
-   * would then report the smaller height and shrink again on every pass.
-   *
-   * It is also never stretched sideways. The list is laid out at its open
-   * width even while the window is still the width of the rail, so the height
-   * measured on the way open is the height the list will actually have.
-   */
-  const report = useCallback((open: boolean) => {
-    const height = card.current?.scrollHeight ?? 0
-    if (height > 0) send('dock:size', { expanded: open, height })
-  }, [])
-
-  useLayoutEffect(() => {
-    report(expanded)
-    const element = card.current
-    if (!element || typeof ResizeObserver === 'undefined') return
-    // A row that wraps to two lines, a note added, a menu opened inside a row:
-    // all of them are the content changing size, and the observer is what
-    // notices every one of them without a list of causes to keep up to date.
-    const observer = new ResizeObserver(() => report(expanded))
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [expanded, report])
-
-  /**
-   * Opening and closing on the pointer, with a wait at each end.
-   *
-   * Without the wait on the way in, crossing the edge of the screen on the way
-   * to something else throws the list open. Without the longer wait on the way
-   * out, the gap between the dock and the note beside it closes the list while
-   * the pointer is still travelling across it.
-   */
-  const schedule = useCallback((open: boolean, delay: number) => {
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setReaching(open), delay)
-  }, [])
-
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
-  const onEnter = () => {
-    schedule(true, EXPAND_DELAY)
-    send('dock:enter', null)
+  const enter = (index: number) => {
+    setNear(index)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => send('dock:hover', { index }), PEEK_DELAY)
   }
 
-  /** The note that floats out beside the row the pointer is resting on. */
-  const peekOn = (pin: Pin, element: HTMLElement) => {
-    window.clearTimeout(hover.current)
-    const box = element.getBoundingClientRect()
-    const y = box.top + box.height / 2
-    hover.current = window.setTimeout(() => send('dock:hover', { id: pin.id, y }), PEEK_DELAY)
+  /**
+   * The pointer slid off a square but is still in this window, in the air
+   * between two squares or on its way to another.
+   *
+   * The square stops leaning at once, and the note is left to the app's window
+   * to close. Saying "gone" here would close a note that the next square is
+   * about to replace a few milliseconds later, and the pair would read as a
+   * blink rather than as a move.
+   */
+  const leaveChip = () => {
+    setNear(null)
+    window.clearTimeout(timer.current)
   }
 
-  const click = (pin: Pin, element: HTMLElement) => {
-    window.clearTimeout(hover.current)
-    const box = element.getBoundingClientRect()
-    send('dock:click', { id: pin.id, y: box.top + box.height / 2 })
+  /**
+   * The pointer left the column altogether.
+   *
+   * This is the quick half of noticing; it only fires while the system still
+   * thinks the pointer belongs to this window, which it does not once the
+   * pointer is well away. The other half is the app's window, which watches
+   * where the pointer actually is.
+   */
+  const leaveColumn = () => {
+    leaveChip()
+    send('dock:leave', null)
   }
 
-  const move = (id: string, by: number) => {
-    const order = state.pins.map((pin) => pin.id)
-    const at = order.indexOf(id)
-    const to = at + by
-    if (at < 0 || to < 0 || to >= order.length) return
-    order.splice(to, 0, ...order.splice(at, 1))
-    send('dock:reorder', { ids: order })
+  const addNote = () => {
+    leaveColumn()
+    send('dock:new', null)
   }
-
-  const rolled = !expanded && state.autoCollapse
 
   return (
-    <div
-      className="dock"
-      data-side={state.side}
-      data-expanded={expanded}
-      style={
-        {
-          '--dock-width': DOCK_WIDTH + 'px',
-          '--rail-width': RAIL_WIDTH + 'px',
-        } as CSSProperties
-      }
-      onPointerEnter={onEnter}
-    >
-      <div className="dock-fit" ref={card}>
-        {rolled ? (
-          <div className="dock-rail" aria-hidden="true">
-            {state.pins.length === 0 ? (
-              <span className="dock-rail-empty" />
-            ) : (
-              state.pins.map((pin) => (
-                <span
-                  key={pin.id}
-                  className={'dock-dash' + (state.dirty.includes(pin.id) ? ' is-dirty' : '')}
-                  data-color={pin.color}
-                />
-              ))
-            )}
-          </div>
-        ) : (
-          <div className="dock-card">
-            <div className="dock-head">
-              <button
-                type="button"
-                className="dock-brand"
-                title="Abrir o markdown-viewer"
-                aria-label="Abrir o markdown-viewer"
-                onClick={() => void showMainWindow()}
-              >
-                <BrandMark size={16} />
-              </button>
-              <span className="dock-title">Notas</span>
-              <button
-                type="button"
-                className="icon-button is-small"
-                title="Nova nota"
-                aria-label="Nova nota"
-                onClick={() => send('dock:new', null)}
-              >
-                <PlusIcon size={16} />
-              </button>
-            </div>
+    <div className="dock" data-side={state.side} onPointerLeave={leaveColumn}>
+      <div className="dock-column">
+        {state.pins.map((pin: Pin, index) => (
+          <button
+            key={pin.id}
+            type="button"
+            className={
+              'chip' +
+              (near === index ? ' is-near' : '') +
+              (state.dirty.includes(pin.id) ? ' is-dirty' : '')
+            }
+            data-color={pin.color}
+            // Each square comes in a beat after the one above it, so a column
+            // that just gained a note reads as growing rather than blinking.
+            style={{ animationDelay: index * 45 + 'ms' }}
+            aria-label={pinTitle(pin)}
+            title={pinTitle(pin)}
+            onPointerEnter={() => enter(index)}
+            onPointerLeave={leaveChip}
+            onClick={() => send('note:open-in-app', { id: pin.id })}
+          >
+            <span className="chip-face" />
+            <span className="chip-mark" aria-hidden="true" />
+          </button>
+        ))}
 
-            {state.pins.length === 0 ? (
-              <p className="dock-empty">
-                Nada fixado ainda. O <strong>+</strong> escreve uma nota aqui mesmo, e o alfinete do
-                app traz para cá um arquivo que já existe.
-              </p>
-            ) : (
-              <ul className="dock-list">
-                {state.pins.map((pin, index) => (
-                  <li key={pin.id} className="dock-item">
-                    <div
-                      className={
-                        'dock-row' +
-                        (state.stuck === pin.id ? ' is-stuck' : '') +
-                        (state.dirty.includes(pin.id) ? ' is-dirty' : '')
-                      }
-                      data-color={pin.color}
-                      role="button"
-                      tabIndex={0}
-                      title={pin.label ?? pin.path}
-                      onPointerEnter={(event) => peekOn(pin, event.currentTarget)}
-                      onClick={(event) => click(pin, event.currentTarget)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') click(pin, event.currentTarget)
-                      }}
-                    >
-                      <span className="dock-colour" />
-                      <span className="dock-name">{pinTitle(pin)}</span>
-                      <span className="dock-dot" aria-label="Não salvo" />
-                      <button
-                        type="button"
-                        className="icon-button is-small dock-more"
-                        aria-label={'Ações de ' + pinTitle(pin)}
-                        aria-expanded={openRow === pin.id}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          setRowMenu((current) => (current === pin.id ? null : pin.id))
-                        }}
-                      >
-                        <MoreIcon size={15} />
-                      </button>
-                    </div>
-
-                    {/* The actions open inside the row and not over it: a window
-                      this narrow has nowhere to float a menu, and anything
-                      drawn past its edge is simply cut off by the system. */}
-                    {openRow === pin.id && (
-                      <div className="dock-actions">
-                        <div className="dock-swatches" role="group" aria-label="Cor">
-                          {PIN_COLORS.map((color: PinColor) => (
-                            <button
-                              key={color}
-                              type="button"
-                              className="dock-swatch"
-                              data-color={color}
-                              aria-label={color}
-                              aria-pressed={pin.color === color}
-                              onClick={() => send('dock:recolour', { id: pin.id, color })}
-                            />
-                          ))}
-                        </div>
-                        <div className="dock-action-row">
-                          <button
-                            type="button"
-                            className="dock-action"
-                            onClick={() => send('note:open-in-app', { id: pin.id })}
-                          >
-                            <OpenInAppIcon size={15} />
-                            Abrir no app
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-button is-small"
-                            aria-label="Subir"
-                            title="Subir"
-                            disabled={index === 0}
-                            onClick={() => move(pin.id, -1)}
-                          >
-                            <span className="dock-arrow">↑</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-button is-small"
-                            aria-label="Descer"
-                            title="Descer"
-                            disabled={index === state.pins.length - 1}
-                            onClick={() => move(pin.id, 1)}
-                          >
-                            <span className="dock-arrow">↓</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-button is-small is-danger"
-                            aria-label="Desafixar"
-                            title="Desafixar"
-                            onClick={() => send('dock:unpin', { id: pin.id })}
-                          >
-                            <UnpinIcon size={15} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+        {/* Wearing the colour the next note will be born with, so the square
+            says what it is about to make. */}
+        <button
+          type="button"
+          className={'chip is-new' + (near === -1 ? ' is-near' : '')}
+          data-color={state.nextColor}
+          style={{ animationDelay: state.pins.length * 45 + 'ms' }}
+          aria-label="Nova nota"
+          title="Nova nota"
+          // Moving onto this one puts away whatever note was showing: it has
+          // none of its own, and a note left open beside it would look like
+          // the note this square is about to write.
+          onPointerEnter={() => {
+            setNear(-1)
+            window.clearTimeout(timer.current)
+            send('dock:leave', null)
+          }}
+          onPointerLeave={leaveChip}
+          onClick={addNote}
+        >
+          <span className="chip-face" />
+          <PlusIcon size={15} className="chip-plus" />
+        </button>
       </div>
     </div>
   )

@@ -199,6 +199,11 @@ fn build(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
         // No title bar, because a panel the width of a scrollbar has nowhere
         // to put one. The interface draws what little furniture it needs.
         .decorations(false)
+        // No background of its own: the squares and the card draw themselves,
+        // rounded corners and shadow included, and the desktop shows between
+        // them.
+        .transparent(true)
+        .shadow(false)
         .always_on_top(true)
         // It follows the person between desktops instead of staying behind on
         // the one it was opened in.

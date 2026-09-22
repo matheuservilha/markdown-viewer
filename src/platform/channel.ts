@@ -21,20 +21,15 @@ const EVENT = 'app:message'
 /** Tells our own messages apart from everybody else's: Tauri sends to all. */
 const ME = Math.random().toString(36).slice(2)
 
-/** What the dock needs to draw itself, which is everything it knows. */
+/** What the column of squares needs to draw itself, which is all it knows. */
 export interface DockState {
   pins: Pin[]
   side: Side
-  autoCollapse: boolean
   theme: 'light' | 'dark'
-  /** Ids of the notes with something unsaved in them, so the dot can show. */
+  /** Ids of the notes with something unsaved in them, so the corner can show. */
   dirty: string[]
-  /**
-   * The note whose floating window was fixed by a click, if any. The dock
-   * stays open while one is: rolling up the list under an open note would
-   * leave the note pointing at nothing.
-   */
-  stuck: string | null
+  /** The colour the next note will be born with, worn by the square that adds one. */
+  nextColor: PinColor
 }
 
 /** A note handed to the floating window, ready to show. */
@@ -42,11 +37,7 @@ export interface PeekNote {
   pin: Pin
   /** The text, for a draft. A file is read from disk by the panel itself. */
   draftText?: string
-  /** Fixed by a click, so it no longer goes away when the pointer leaves. */
-  stuck: boolean
   theme: 'light' | 'dark'
-  readOnly: boolean
-  autosave: boolean
 }
 
 export interface Messages {
@@ -54,24 +45,20 @@ export interface Messages {
   'panel:hello': { role: 'dock' | 'peek' }
 
   'dock:state': DockState
-  /** The pointer reached the edge, so the app's window starts watching it. */
-  'dock:enter': null
-  /** The pointer is on neither panel any more: roll the list back up. */
-  'dock:away': null
-  'dock:hover': { id: string; y: number }
-  'dock:click': { id: string; y: number }
-  /** The list got taller or shorter, or rolled up. */
-  'dock:size': { expanded: boolean; height: number }
+
+  /** The pointer came to rest on the square at this place in the column. */
+  'dock:hover': { index: number }
+  /**
+   * The pointer left that square while still inside the window: moving to
+   * another square, or into the gap between two. It is only the quick half of
+   * noticing; the app's window watches the pointer itself for the other half,
+   * because a panel is not told when the pointer leaves the window entirely.
+   */
+  'dock:leave': null
+  /** The square that writes a new note was clicked. */
   'dock:new': null
-  'dock:unpin': { id: string }
-  'dock:recolour': { id: string; color: PinColor }
-  'dock:reorder': { ids: string[] }
 
   'peek:note': PeekNote | null
-  'peek:close': null
-  'peek:dirty': { id: string; dirty: boolean }
-  /** A draft edited in the floating window; the app's window stores it. */
-  'peek:draft': { id: string; text: string }
 
   /** Bring the app's window back and open this note in it. */
   'note:open-in-app': { id: string }

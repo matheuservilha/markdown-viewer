@@ -24,7 +24,13 @@ log = "0.4"
 # `tray-icon` is what keeps the app alive after its window is closed: the
 # notes on the edge of the screen outlive the editor, and the tray is the
 # only way back to it and the only way out of it.
-tauri = { version = "2.11.3", features = ["tray-icon"] }
+#
+# `macos-private-api` is what lets a window have no background. Without it the
+# squares on the edge of the screen would be squares drawn on a grey slab, and
+# the note that floats out would have square corners on a rectangle nobody
+# asked for. It goes with `macOSPrivateApi` in `tauri.conf.json`, and it is
+# the one thing here that would stop this app being sold in the App Store.
+tauri = { version = "2.11.3", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-log = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"

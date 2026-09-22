@@ -1,9 +1,10 @@
 # Notas fixadas na borda da tela
 
-Uma faixa fina fica colada na borda do monitor, por cima de todos os outros
-apps. Cada traço colorido é uma nota. O mouse encosta, a faixa abre na lista
-inteira; o mouse para em cima de uma linha, a nota sai voando ao lado; um
-clique prende a nota e ela vira um editor de verdade.
+Uma coluna de quadradinhos coloridos fica colada na borda do monitor, por cima
+de todos os outros apps, um quadradinho por nota. Não tem painel nem moldura:
+a janela é transparente, e entre um quadradinho e outro aparece o que estiver
+atrás. O mouse para em cima de um, a nota sai ao lado para você ler. Tira o
+mouse, some.
 
 ## Como uma nota chega lá
 
@@ -11,53 +12,34 @@ São dois caminhos, e nenhum dos dois acontece sem querer.
 
 **Fixando um arquivo que já existe.** O alfinete na barra de cima do app fixa
 o arquivo aberto, e `⌘⇧P` faz o mesmo. Na árvore de arquivos, o botão direito
-também oferece. Um segundo clique desafixa.
+também oferece. Um segundo clique desafixa. Desafixar é sempre no app: o
+quadradinho não tem menu, porque 26 pixels não têm onde pôr um.
 
-**Escrevendo direto na barra.** O `+` no topo da lista abre uma nota nova na
-hora, sem diálogo e sem arquivo nenhum no disco. Ela é um rascunho, igual ao que
-o `⌘N` já abria: aparece também como aba não salva na janela principal, e o
-`⌘S` de lá é que pergunta onde gravar. O nome dela é a primeira linha do que
-você escreveu, na aba e na barra ao mesmo tempo.
+**Clicando no `+`.** O quadradinho de baixo abre uma nota nova na hora, sem
+diálogo e sem arquivo nenhum no disco. Ela é um rascunho, igual ao que o `⌘N`
+já abria: aparece também como aba não salva na janela principal, e o `⌘S` de lá
+é que pergunta onde gravar. O nome dela é a primeira linha do que você
+escreveu, na aba e no quadradinho ao mesmo tempo.
 
-Fechar essa aba joga o texto fora, então ela sai da barra junto. Arquivo é
+Fechar essa aba joga o texto fora, então o quadradinho vai junto. Arquivo é
 outra coisa: fechar a aba de um arquivo não desafixa nada, porque o arquivo
 continua no disco.
 
-## Os três estados
+## O que acontece quando o mouse passa
 
-**Em repouso** a faixa tem treze pixels, um traço por nota, com a cor de cada
-uma. É o bastante para saber quantas notas existem e qual é qual, e é pouco o
-bastante para você esquecer que ela está lá. Uma nota com texto não salvo tem
-o traço mais comprido.
+Parar em cima de um quadradinho abre a nota dele ao lado, para ler. Ela não
+fixa, não pede nada e não pega o teclado: é uma olhada. Tirar o mouse do
+quadradinho fecha, e **tirar para cima da própria nota fecha igual**. Se você
+quer escrever nela, clique no quadradinho e ela abre no app.
 
-**Aberta** a lista mostra os nomes. O `…` de cada linha abre as ações dentro da
-própria linha: a cor, subir, descer, abrir no app e desafixar. As ações abrem
-dentro e não por cima porque uma janela dessa largura não tem onde botar um
-menu flutuante: o que for desenhado fora dela é cortado pelo sistema.
+O quadradinho de baixo, o do `+`, veste a cor que a próxima nota vai ter.
+Clicar nele escreve um rascunho novo, que vira mais um quadradinho na coluna e
+uma aba não salva na janela principal.
 
-**Flutuando** é a nota em si, colada na barra. Parar o mouse em cima de uma
-linha só mostra o texto; o clique é que prende a janela e libera a escrita.
-Presa, ela tem o mesmo editor do app: rolagem, caixinha de tarefa, tabela,
-negrito, tudo. `Esc` fecha.
-
-A barra e a nota ficam abertas enquanto o mouse estiver em cima de qualquer uma
-das duas, e fecham cerca de 300 ms depois de ele sair das duas. Quem decide
-isso é a janela principal, perguntando ao sistema onde o ponteiro está umas dez
-vezes por segundo. Perguntar aos painéis não funciona: janela que está sempre
-por cima e nunca foi clicada não é a janela ativa, e não recebe do sistema o
-aviso de que o ponteiro saiu. Foi o que deixou a lista aberta na tela vazia na
-primeira versão.
-
-## Sobre salvar
-
-A nota flutuante grava sozinha depois de uma pausa na digitação, **mesmo com
-"Salvar sozinho" desligado nos ajustes**. Aqui não existe aba, nem pergunta na
-hora de fechar: a janela some com um clique em qualquer outro lugar, e o texto
-dentro dela seria a única cópia. Um painel que esquece é pior que um painel que
-salva.
-
-Se o arquivo mudou por fora enquanto você escrevia, ela não sobrescreve. Aparece
-uma tarja com "Recarregar" e "Salvar mesmo assim", e a decisão é sua.
+Quem fecha a nota é a janela principal, perguntando ao sistema onde o ponteiro
+está umas dezesseis vezes por segundo. Perguntar aos painéis não funciona:
+janela que fica sempre por cima e nunca foi clicada não é a janela ativa, e não
+recebe do sistema o aviso de que o ponteiro saiu.
 
 ## Fechar o app não fecha as notas
 
@@ -96,16 +78,26 @@ rascunhos das abas já moravam.
 
 ## Como isso funciona por dentro
 
-São três janelas do mesmo app: a janela principal, a barra e a nota flutuante.
-A barra e a nota não são um segundo programa, são este aqui com outro rótulo de
-janela, que é o que faz o editor da nota flutuante ser o mesmo editor do app,
-tema e teclado inclusive.
+São três janelas do mesmo app: a janela principal, a coluna de quadradinhos e a
+nota que flutua. As duas últimas não são um segundo programa, são este aqui com
+outro rótulo de janela, que é o que faz a nota ser desenhada pelo mesmo editor
+do app, tema incluso.
+
+As duas são transparentes e têm exatamente o tamanho do que desenham. Isso é
+regra e não enfeite: janela transparente continua sendo janela, e todo pedaço
+dela que a pessoa não vê é um pedaço de tela que engole clique calado. A coluna
+tem 40px de largura e a altura exata dos quadradinhos.
+
+No macOS, janela sem fundo depende do `macOSPrivateApi`, ligado no
+`tauri.conf.json` e no `Cargo.toml`. É o que impediria este app de ser vendido
+na App Store, e ele não é. No Linux depende de ter compositor, que qualquer
+ambiente atual tem.
 
 A janela principal é dona de tudo. Ela guarda a lista, a ordem e as cores, e é
 a única que escreve qualquer coisa. As outras duas informam o que o mouse fez e
 desenham o que mandarem: duas janelas com uma cópia da mesma lista cada uma,
 trocando recados, é o defeito que esse arranjo não tem.
 
-Onde cada painel vai parar na tela é conta, e a conta mora em
-`src/app/dock-layout.ts`, longe do sistema de janelas, para poder ser conferida
+Onde cada quadradinho e cada nota vão parar na tela é conta, e a conta mora em
+`src/app/dock-layout.ts`, longe do sistema de janelas, com 21 testes que rodam
 sem uma tela por perto.

@@ -40,8 +40,6 @@ export interface Settings {
   dock: boolean
   /** Which edge they sit on. */
   dockSide: Side
-  /** Whether the dock rolls up to a rail when the pointer is elsewhere. */
-  dockCollapse: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -61,13 +59,13 @@ export const DEFAULTS: Settings = {
   // somebody's back is the kind of help that is only welcome when it was asked
   // for.
   autosave: false,
-  // On, but empty: with nothing pinned the dock is a rail the width of a
-  // scrollbar, and it is the only thing that shows the feature exists.
+  // On, but empty: with nothing pinned there is one square on the edge, the
+  // one that writes a note, and it is the only thing that shows the feature
+  // exists.
   dock: true,
   // The right, because that is where the scrollbar already is and where the
   // text is not.
   dockSide: 'right',
-  dockCollapse: true,
 }
 
 export const LIMITS = {

@@ -363,31 +363,18 @@ export function App() {
   const dock = useDock({
     enabled: settings.dock,
     side: settings.dockSide,
-    autoCollapse: settings.dockCollapse,
     theme,
-    readOnly: settings.readOnly,
-    autosave: settings.autosave,
     dirty: dirtyIds,
 
     draftText: useCallback((pinId: string) => latestState.current.docs[pinId]?.text, []),
 
-    onDraftText: useCallback(
-      (pinId: string, text: string) => {
-        actions.edit(pinId, text)
-        // The tab and the row on the edge of the screen show the same note, so
-        // they answer to the same name: its own first line.
-        const tab = latestState.current.tabs.find((one: Tab) => one.id === pinId)
-        if (tab) actions.renameTab(pinId, noteTitle(text, tab.name))
-      },
-      [actions],
-    ),
-
     /**
-     * The dock's own button writes an ordinary draft, in an ordinary tab.
+     * The square at the foot of the column writes an ordinary draft, in an
+     * ordinary tab.
      *
-     * It is the same note in both places: unsaved in the tab strip and pinned
-     * on the edge of the screen. Closing the tab throws the text away, so the
-     * pin goes with it.
+     * It is the same note in both places: unsaved in the tab strip and a
+     * square on the edge of the screen. Closing the tab throws the text away,
+     * so the square goes with it.
      */
     onNewNote: useCallback((): PinTarget | null => {
       const taken = latestState.current.tabs.map((tab: Tab) => tab.name)
@@ -1160,7 +1147,17 @@ export function App() {
                   views.current = { ...views.current, [activeTab.id]: view }
                   persist()
                 }}
-                onChange={(text) => actions.edit(activeTab.id, text)}
+                onChange={(text) => {
+                  actions.edit(activeTab.id, text)
+                  // A draft has no file to take its name from, so it takes it
+                  // from its own first line, in the tab strip and on its
+                  // square at the same time.
+                  if (isDraft(activeTab)) {
+                    const named = noteTitle(text, activeTab.name)
+                    actions.renameTab(activeTab.id, named)
+                    dock.renamePin(activeTab.id, named)
+                  }
+                }}
                 onSave={saveActive}
                 onOutline={setHeadings}
                 onReady={(view) => {

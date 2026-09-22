@@ -1984,17 +1984,17 @@ a:focus-visible,
 /* ------------------------------------------------- notas fixadas */
 
 /*
- * The dock on the edge of the screen and the note that floats beside it.
+ * The squares on the edge of the screen, and the note that floats out of one.
  *
- * Both are ordinary windows without a title bar, sized to their contents by
- * the app's window. Nothing here is transparent and nothing has a rounded
- * outer corner: a panel flush against the edge of a screen has no outside to
- * round, and transparency is the one window feature that behaves differently
- * on each of the three systems.
+ * Both windows have no background of their own, so what is drawn here is all
+ * there is: between the squares, and around the card, the desktop shows
+ * through. The window is exactly as big as its contents, because a transparent
+ * window is still a window, and any part of it the person cannot see is a part
+ * of the screen that silently swallows their clicks.
  */
 
-/* The six colours a pinned note can carry, borrowed from the palette the
-   callouts already use, so they answer to the theme without a second set. */
+/* The six colours a note can carry, borrowed from the palette the callouts
+   already use, so they answer to the theme without a second set. */
 [data-color='ambar'] {
   --pin: var(--tone-yellow);
 }
@@ -2014,343 +2014,230 @@ a:focus-visible,
   --pin: var(--tone-teal);
 }
 
+html[data-window='dock'],
 html[data-window='dock'] body,
+html[data-window='peek'],
 html[data-window='peek'] body {
-  background: var(--surface-2);
+  background: transparent;
 }
+
+/*
+ * The easing everything on the edge of the screen moves with: fast out of the
+ * gate and slightly past its mark before settling. A square that slides
+ * linearly to meet the pointer reads as a panel opening; one that overshoots a
+ * pixel and comes back reads as a thing.
+ */
+:root {
+  --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+/* ---------------------------------------------------------- os quadradinhos */
 
 .dock {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   height: 100%;
-  overflow: hidden;
-  background: var(--surface-2);
-  font-size: 0.8125rem;
 }
 
-/* The face that touches the screen edge carries no border; the one that faces
-   the desktop does, which is what makes the panel read as attached. */
-.dock[data-side='right'] {
-  border-left: 1px solid var(--border-default);
-}
-
-.dock[data-side='left'] {
-  border-right: 1px solid var(--border-default);
-}
-
-/*
- * The box that gets measured, and the reason the dock can shrink again.
- *
- * `flex: 0 1 auto` is the whole trick: it is never stretched to fill the
- * window, so its height is its content's height and reporting that height
- * cannot make it report a smaller one next time. It does shrink when the
- * window is shorter than the content, and then the list scrolls inside it.
- *
- * Its width is fixed rather than inherited from the window, so the list is
- * laid out at its open width even while the window is still the width of the
- * rail. Without that, the height measured on the way open is the height of a
- * list wrapped into thirteen pixels.
- */
-.dock-fit {
-  flex: 0 1 auto;
-  min-height: 0;
-  width: var(--dock-width);
-  overflow-y: auto;
-}
-
-.dock[data-expanded='false'] .dock-fit {
-  width: var(--rail-width);
-  overflow: hidden;
-}
-
-/* The rail hugs the edge it is docked to, whatever width the window has. */
-.dock[data-side='right'] {
-  align-items: flex-end;
-}
-
-.dock[data-side='left'] {
-  align-items: flex-start;
-}
-
-/* -------- rolled up */
-
-.dock-rail {
+.dock-column {
   display: flex;
   flex-direction: column;
-  gap: 0.3125rem;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 0;
+}
+
+.chip {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  padding: 0.625rem 0;
-}
-
-.dock-dash {
-  width: 0.3125rem;
-  height: 0.875rem;
-  border-radius: 999px;
-  background: var(--pin, var(--text-disabled));
-}
-
-/* A note with something unwritten in it grows a little, which is as much as a
-   five pixel dash can say. */
-.dock-dash.is-dirty {
-  height: 1.375rem;
-}
-
-/* Nothing pinned: one grey dash, so the rail is still a thing you can find. */
-.dock-rail-empty {
-  width: 0.3125rem;
-  height: 1.5rem;
-  border-radius: 999px;
-  background: var(--border-emphasis);
-}
-
-/* -------- open */
-
-.dock-card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* The header stays put while the list scrolls under it: with the whole panel
-   in one scroller, it is the only thing keeping the button that writes a new
-   note on screen. */
-.dock-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  flex: 0 0 auto;
-  gap: 0.375rem;
-  align-items: center;
-  height: 2.25rem;
-  padding: 0 0.375rem 0 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-}
-
-.dock-brand {
-  display: inline-flex;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+
+  /* Each square comes in from behind the edge of the screen, one after the
+     other, so a column that just gained a note grows rather than blinks. */
+  animation: chip-in 260ms var(--spring) backwards;
+  transition: transform 180ms var(--spring);
 }
 
-.dock-title {
-  flex: 1;
-  color: var(--text-secondary);
-  font-weight: 560;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
+/* The lean out to meet the pointer, towards the middle of the screen, which is
+   the only direction there is anything to lean into. */
+.dock[data-side='right'] .chip {
+  align-self: flex-end;
+  margin-right: 5px;
 }
 
-.dock-empty {
-  margin: 0;
-  padding: 0.875rem 0.75rem;
-  color: var(--text-tertiary);
-  font-size: 0.75rem;
-  line-height: 1.5;
+.dock[data-side='left'] .chip {
+  align-self: flex-start;
+  margin-left: 5px;
 }
 
-.dock-empty strong {
-  color: var(--text-secondary);
-  font-weight: 600;
+.dock[data-side='right'] .chip.is-near {
+  transform: translateX(-9px);
 }
 
-.dock-list {
-  margin: 0;
-  padding: 0.25rem;
-  list-style: none;
+.dock[data-side='left'] .chip.is-near {
+  transform: translateX(9px);
 }
 
-.dock-item + .dock-item {
-  margin-top: 0.125rem;
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.7);
+  }
 }
 
-.dock-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  height: 1.875rem;
-  padding: 0 0.125rem 0 0.375rem;
-  border-radius: var(--radius-sm);
-  cursor: default;
-  transition: background-color var(--ease);
+.dock[data-side='left'] .chip {
+  animation-name: chip-in-left;
 }
 
-.dock-row:hover {
-  background: var(--surface-hover);
+@keyframes chip-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px) scale(0.7);
+  }
 }
 
-/* The note this row has open beside it, so the pair reads as one thing. */
-.dock-row.is-stuck {
-  background: var(--surface-hover);
-  box-shadow: inset 0 0 0 1px var(--border-emphasis);
+/* The coloured tile itself. It is a child and not the button, so it can grow
+   under the pointer while the button stays the size of its hit area. */
+.chip-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(160deg, color-mix(in oklab, var(--pin) 88%, white), var(--pin));
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 28%),
+    0 4px 10px rgb(0 0 0 / 18%),
+    inset 0 1px 0 rgb(255 255 255 / 22%);
+  transition:
+    transform 180ms var(--spring),
+    box-shadow 180ms var(--spring),
+    border-radius 180ms var(--spring);
 }
 
-.dock-colour {
-  flex: 0 0 auto;
-  width: 0.25rem;
-  height: 1.0625rem;
+.chip.is-near .chip-face {
+  border-radius: 10px;
+  transform: scale(1.09);
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 30%),
+    0 10px 22px rgb(0 0 0 / 26%),
+    inset 0 1px 0 rgb(255 255 255 / 30%);
+}
+
+.chip:focus-visible {
+  outline: none;
+}
+
+.chip:focus-visible .chip-face {
+  box-shadow:
+    0 0 0 2px var(--bg-app),
+    0 0 0 4px var(--pin);
+}
+
+/* A note with something unwritten in it wears a notch in the corner. */
+.chip-mark {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: var(--pin, var(--text-disabled));
-}
-
-.dock-name {
-  flex: 1;
-  overflow: hidden;
-  color: var(--text-primary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* The unsaved dot, which gives way to the row's own menu button on hover, the
-   same trade the tab strip makes. */
-.dock-dot {
-  flex: 0 0 auto;
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 999px;
-  background: var(--accent);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 0 0 1.5px rgb(0 0 0 / 22%);
   opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 160ms var(--spring),
+    transform 160ms var(--spring);
 }
 
-.dock-row.is-dirty .dock-dot {
+.chip.is-dirty .chip-mark {
   opacity: 1;
+  transform: scale(1);
 }
 
-.dock-more {
-  opacity: 0;
-}
-
-.dock-row:hover .dock-more,
-.dock-more:focus-visible,
-.dock-row[aria-expanded='true'] .dock-more {
-  opacity: 1;
-}
-
-.dock-row:hover.is-dirty .dock-dot {
-  display: none;
-}
-
-/* -------- the actions inside a row */
+/* ---- the square that writes a new note */
 
 /*
- * They open inside the list rather than floating over it. A window this narrow
- * has nowhere to put a menu: anything drawn past the edge of the window is cut
- * off by the system, not clipped by CSS, so there is no overflow to fix.
+ * It wears the colour the next note will be born with, so the square says what
+ * it is about to make. Hollow until the pointer arrives, so a column of five
+ * notes plus this one still reads as five notes.
  */
-.dock-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin: 0.25rem 0 0.375rem;
-  padding: 0.5rem 0.375rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
-}
-
-.dock-swatches {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: space-between;
-}
-
-.dock-swatch {
-  width: 1.125rem;
-  height: 1.125rem;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: var(--pin);
-  cursor: pointer;
-  opacity: 0.7;
-  transition:
-    opacity var(--ease),
-    box-shadow var(--ease);
-}
-
-.dock-swatch:hover,
-.dock-swatch[aria-pressed='true'] {
-  opacity: 1;
-}
-
-.dock-swatch[aria-pressed='true'] {
+.chip.is-new .chip-face {
+  background: color-mix(in oklab, var(--pin) 16%, transparent);
   box-shadow:
-    0 0 0 2px var(--surface-1),
-    0 0 0 3px var(--pin);
+    inset 0 0 0 1.5px color-mix(in oklab, var(--pin) 55%, transparent),
+    0 1px 3px rgb(0 0 0 / 16%);
 }
 
-.dock-action-row {
-  display: flex;
-  gap: 0.125rem;
-  align-items: center;
+.chip.is-new.is-near .chip-face {
+  background: linear-gradient(160deg, color-mix(in oklab, var(--pin) 88%, white), var(--pin));
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 30%),
+    0 10px 22px rgb(0 0 0 / 26%),
+    inset 0 1px 0 rgb(255 255 255 / 30%);
 }
 
-.dock-action {
-  display: inline-flex;
-  flex: 1;
-  gap: 0.375rem;
-  align-items: center;
-  height: 1.75rem;
-  padding: 0 0.375rem;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  white-space: nowrap;
-  cursor: pointer;
+.chip-plus {
+  position: relative;
+  color: var(--pin);
+  transition:
+    color 180ms var(--spring),
+    transform 260ms var(--spring);
 }
 
-.dock-action:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
+.chip.is-new.is-near .chip-plus {
+  color: #fff;
+  transform: rotate(90deg);
 }
 
-.dock-arrow {
-  font-size: 0.8125rem;
-  line-height: 1;
-}
-
-.icon-button.is-danger:hover {
-  color: var(--tone-red);
-}
-
-.icon-button:disabled {
-  color: var(--text-disabled);
-  cursor: default;
-}
-
-.icon-button:disabled:hover {
-  background: transparent;
-  color: var(--text-disabled);
-}
-
-/* ------------------------------------------------------ nota flutuante */
+/* ------------------------------------------------------- a nota que flutua */
 
 .peek {
   display: flex;
-  flex-direction: column;
   height: 100%;
+  padding: 0;
+}
+
+.peek.is-blank {
+  display: none;
+}
+
+/*
+ * The card is the window's only child and carries everything the window used
+ * to: the corners, the edge and the shadow. It comes in from the side its
+ * square is on, so it reads as coming out of that square.
+ */
+.peek-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border-emphasis);
+  border-radius: 14px;
   background: var(--bg-content);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 22%),
+    0 18px 44px rgb(0 0 0 / 34%);
+  animation: peek-in 170ms var(--spring) backwards;
 
   /* The reading column is the window: there is no room here for the width the
      app's editor uses, and centring inside 392px is not a column anyway. */
   --measure: 100%;
 }
 
-.peek.is-blank {
-  background: var(--surface-2);
-}
-
-/* A note that is only being looked at says so by being quieter than one that
-   was opened to be written in. */
-.peek[data-stuck='false'] {
-  border-color: var(--border-default);
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.985);
+  }
 }
 
 .peek-head {
@@ -2359,7 +2246,7 @@ html[data-window='peek'] body {
   gap: 0.4375rem;
   align-items: center;
   height: 2.125rem;
-  padding: 0 0.3125rem 0 0.625rem;
+  padding: 0 0.75rem;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-2);
 }
@@ -2391,18 +2278,16 @@ html[data-window='peek'] body {
   font-size: 0.6875rem;
 }
 
-.peek-state {
+/* What the square underneath the pointer does if it is clicked. It is a label
+   and not a button: the click lands on the square, not here. */
+.peek-open {
+  display: inline-flex;
   flex: 0 0 auto;
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 999px;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity var(--ease);
-}
-
-.peek-state[data-dirty='true'] {
-  opacity: 1;
+  gap: 0.25rem;
+  align-items: center;
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  white-space: nowrap;
 }
 
 .peek-body {
@@ -2414,31 +2299,17 @@ html[data-window='peek'] body {
 /* The app's editor breathes because it has a screen to breathe in. Here it
    does not, so the padding comes down to what a card can spare. */
 .peek .cm-content {
-  padding: 0.5rem 0 1.5rem;
+  padding: 0.625rem 0 1.5rem;
 }
 
 .peek .cm-line {
   padding: 0 0.875rem;
 }
 
-.peek-warn {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.375rem 0.625rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-3);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.peek-warn button {
-  border: 0;
-  background: transparent;
-  color: var(--accent-text, var(--accent));
-  font: inherit;
-  cursor: pointer;
+/* Nothing in a glance is meant to be selected or typed in. */
+.peek .cm-cursor,
+.peek .cm-dropCursor {
+  display: none !important;
 }
 
 .peek-gone {
@@ -2448,19 +2319,6 @@ html[data-window='peek'] body {
   font-size: 0.75rem;
 }
 
-/* The one line that says what a click will do, on a panel that opened without
-   being clicked. */
-.peek-hint {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0.3125rem 0.625rem;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-2);
-  color: var(--text-tertiary);
-  font-size: 0.6875rem;
-  text-align: center;
-}
-
 /* A note in the settings window: prose, not a control. */
 .settings-note {
   margin: 0.25rem 0 0;
@@ -2468,4 +2326,16 @@ html[data-window='peek'] body {
   color: var(--text-tertiary);
   font-size: 0.6875rem;
   line-height: 1.45;
+}
+
+/* Somebody who asked their system for less movement gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip-face,
+  .chip-mark,
+  .chip-plus,
+  .peek-card {
+    animation: none;
+    transition: none;
+  }
 }
