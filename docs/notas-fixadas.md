@@ -16,8 +16,9 @@ São dois caminhos, e nenhum dos dois acontece sem querer.
 
 **Fixando um arquivo que já existe.** O alfinete na barra de cima do app fixa
 o arquivo aberto, e `⌘⇧P` faz o mesmo. Na árvore de arquivos, o botão direito
-também oferece. Um segundo clique desafixa. Desafixar é sempre no app: a
-abinha não tem menu, porque dezesseis pixels não têm onde pôr um.
+também oferece. Um segundo clique desafixa. A abinha em si não tem menu,
+porque dezesseis pixels não têm onde pôr um: para tirar uma nota da borda, use
+o alfinete do app ou o da própria nota guardada.
 
 **Clicando no `+`.** O quadradinho de baixo abre uma nota nova na hora, sem
 diálogo e sem arquivo nenhum no disco. Ela é um rascunho, igual ao que o `⌘N`
@@ -38,7 +39,8 @@ fecha, e **tirar para cima da própria nota fecha igual**.
 **Clicar na abinha guarda a nota.** Ela sai um passo para dentro, vira uma
 janela sua e não sai mais: não fecha quando o mouse vai embora, não fecha
 quando você clica em outro programa. Arrasta pela barra de cima, redimensiona
-pelo canto, e fecha no `×` ou no `Esc`. Enquanto ela está lá, passar o mouse
+pelo canto, e fecha no `×` ou no `Esc`. O alfinete cortado, ao lado do `×`,
+tira a nota da borda da tela e fecha a janela junto. Enquanto ela está lá, passar o mouse
 nas outras abinhas continua abrindo as olhadas normalmente.
 
 Dentro da nota guardada dá para escrever. Ela grava sozinha depois de uma pausa

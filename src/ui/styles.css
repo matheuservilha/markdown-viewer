@@ -2130,6 +2130,26 @@ html[data-window='dock'] .chip {
   transition:
     width 200ms var(--spring),
     box-shadow 200ms var(--spring);
+
+  /*
+   * Every face carries the same border, and only the one that writes a new
+   * note colours it in. It is here and not there so that the box its contents
+   * are centred in is the same box in every tab: with the border on one face
+   * only, the sign inside that one sat three quarters of a pixel off from the
+   * dot inside the others, and on a five pixel dot that shows.
+   *
+   * The side that runs off the monitor gets none, because that side is not an
+   * edge anybody drew.
+   */
+  border: 1.5px solid transparent;
+}
+
+.dock[data-side='right'] .chip-face {
+  border-right: 0;
+}
+
+.dock[data-side='left'] .chip-face {
+  border-left: 0;
 }
 
 /* Round on the inside, square on the outside, because the outside is not an
@@ -2168,12 +2188,20 @@ html[data-window='dock'] .chip {
  * travels with the tab as the tab grows instead of standing still while the
  * colour slides out from under it.
  */
+/*
+ * Drawn the way every icon in this app is drawn: a 1.5px stroke and no fill.
+ *
+ * The stroke is the colour of the background and not white, because the faces
+ * change lightness with the theme: the tones are pale on a dark background and
+ * deep on a light one, so one fixed ink would read on one theme and disappear
+ * on the other. Taking the colour from behind the window makes the mark read
+ * as a hole punched through the tab, which contrasts on both by construction.
+ */
 .chip-mark {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid color-mix(in oklab, var(--bg-app) 80%, transparent);
   border-radius: 999px;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 0 0 1.5px rgb(0 0 0 / 20%);
   opacity: 0;
   transition: opacity 160ms var(--spring);
 }
@@ -2193,18 +2221,11 @@ html[data-window='dock'] .chip {
  * monitor can be left undrawn. A ring would draw a line down the edge of the
  * screen and give the tab an outside it is not supposed to have.
  */
+/* It only colours in the border every face already carries. */
 .chip.is-new .chip-face {
-  border: 1.5px solid color-mix(in oklab, var(--pin) 50%, transparent);
+  border-color: color-mix(in oklab, var(--pin) 50%, transparent);
   background: color-mix(in oklab, var(--pin) 20%, transparent);
   box-shadow: none;
-}
-
-.dock[data-side='right'] .chip.is-new .chip-face {
-  border-right: 0;
-}
-
-.dock[data-side='left'] .chip.is-new .chip-face {
-  border-left: 0;
 }
 
 .chip.is-new.is-near .chip-face {

@@ -73,7 +73,7 @@ pub fn watch_chips(app: tauri::AppHandle, rects: Vec<ChipRect>) {
             if generation.load(Ordering::SeqCst) != mine {
                 // Somebody else is watching now. Leave the cursor as we found
                 // it, in case we were the ones holding it as a hand.
-                set_hand(false);
+                ask_for_hand(&app, false);
                 return;
             }
 
@@ -94,7 +94,7 @@ pub fn watch_chips(app: tauri::AppHandle, rects: Vec<ChipRect>) {
             // Set on every pass and not only on the change: the system puts
             // the cursor back to an arrow whenever the pointer moves, and a
             // pointer resting on a tab is still moving a pixel at a time.
-            set_hand(over >= 0);
+            ask_for_hand(&app, over >= 0);
 
             std::thread::sleep(EVERY);
         }
@@ -108,17 +108,24 @@ pub fn watch_chips(app: tauri::AppHandle, rects: Vec<ChipRect>) {
 /// the system only consults those for the application that is active. This one
 /// is not, and is not going to be. Setting the cursor outright is the only way
 /// a window that is merely on top gets to say what the pointer looks like.
+///
+/// It has to happen on the main thread. The watching does not, and must not:
+/// it sleeps between readings, and the main thread is where everything the
+/// person can see is drawn. So the reading happens here and the cursor is
+/// handed over to be set there.
 #[cfg(target_os = "macos")]
-fn set_hand(hand: bool) {
-    use objc2_app_kit::NSCursor;
+fn ask_for_hand(app: &tauri::AppHandle, hand: bool) {
+    let _ = app.run_on_main_thread(move || {
+        use objc2_app_kit::NSCursor;
 
-    if hand {
-        NSCursor::pointingHandCursor().set();
-    } else {
-        NSCursor::arrowCursor().set();
-    }
+        if hand {
+            NSCursor::pointingHandCursor().set();
+        } else {
+            NSCursor::arrowCursor().set();
+        }
+    });
 }
 
 /// Everywhere else the window's own cursor works, and the stylesheet sets it.
 #[cfg(not(target_os = "macos"))]
-fn set_hand(_hand: bool) {}
+fn ask_for_hand(_app: &tauri::AppHandle, _hand: bool) {}

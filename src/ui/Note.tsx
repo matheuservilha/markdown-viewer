@@ -22,7 +22,7 @@ import { hidePanel } from '~/platform/panels'
 import { on, send, type PeekNote } from '~/platform/channel'
 import { EditorPane } from './EditorPane'
 import { installWindowDrag } from './window-drag'
-import { CloseIcon, OpenInAppIcon } from './icons'
+import { CloseIcon, OpenInAppIcon, UnpinIcon } from './icons'
 
 /** How long the typing has to stop before the note is written. */
 const SAVE_DELAY = 1100
@@ -270,6 +270,23 @@ export function Note() {
             onClick={() => send('note:open-in-app', { id: pin.id })}
           >
             <OpenInAppIcon size={14} />
+          </button>
+          {/* Taking the note off the edge of the screen closes this window
+              too: it is the window of an abinha that is about to stop
+              existing. Anything unwritten is written first, the same as on
+              the way out through the corner. */}
+          <button
+            type="button"
+            className="icon-button is-small"
+            aria-label="Tirar da borda da tela"
+            title="Tirar da borda da tela"
+            onClick={() => {
+              window.clearTimeout(timer.current)
+              if (!draft && dirty) void save()
+              send('note:unpin', { id: pin.id })
+            }}
+          >
+            <UnpinIcon size={14} />
           </button>
           <button
             type="button"

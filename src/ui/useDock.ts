@@ -321,6 +321,8 @@ export function useDock(options: DockOptions) {
 
       on('note:closed', () => setKept(null)),
 
+      on('note:unpin', ({ id }) => forgetRef.current(id)),
+
       on('note:dirty', ({ id, dirty }) => {
         setKeptDirty((current) =>
           dirty ? [...new Set([...current, id])] : current.filter((held) => held !== id),
@@ -370,6 +372,13 @@ export function useDock(options: DockOptions) {
     [],
   )
 
+  /**
+   * Unpinning reaches the message handlers through a reference because it is
+   * defined below them, and moving either one would drag half the file with
+   * it.
+   */
+  const forgetRef = useRef<(id: string) => void>(() => {})
+
   const forget = useCallback((id: string) => {
     setPins((current) => removePin(current, id))
     // A note that is no longer on the edge of the screen has nothing keeping
@@ -380,6 +389,11 @@ export function useDock(options: DockOptions) {
       return null
     })
   }, [])
+
+  useEffect(() => {
+    // oxlint-disable-next-line immutability
+    forgetRef.current = forget
+  }, [forget])
 
   return { pins, togglePin: toggle, renamePin: rename, unpin: forget }
 }
