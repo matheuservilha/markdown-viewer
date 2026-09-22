@@ -1,5 +1,7 @@
 import { memo, useDeferredValue, useMemo } from 'react'
 import type { Doc, Tab } from '~/app/store'
+import type { Base } from '~/platform/fs'
+import { Breadcrumbs } from './Breadcrumbs'
 import { AlertIcon } from './icons'
 
 /** 200 words a minute, the figure Bear and iA Writer both use. */
@@ -28,11 +30,12 @@ function countWords(text: string): number {
 interface Props {
   tab: Tab | null
   doc: Doc | null
+  base: Base | undefined
   onReload: () => void
   onSave: () => void
 }
 
-export const StatusBar = memo(function StatusBar({ tab, doc, onReload, onSave }: Props) {
+export const StatusBar = memo(function StatusBar({ tab, doc, base, onReload, onSave }: Props) {
   // The counts are worth having, not worth blocking a keystroke for: React is
   // free to recompute them once the typing pauses.
   const text = useDeferredValue(doc?.text ?? '')
@@ -45,7 +48,13 @@ export const StatusBar = memo(function StatusBar({ tab, doc, onReload, onSave }:
     }
   }, [text])
 
-  if (!tab || !doc) return <footer className="status" />
+  if (!tab || !doc)
+    return (
+      <footer className="status">
+        <span className="status-spacer" />
+        <span className="status-version">{__APP_VERSION__}</span>
+      </footer>
+    )
 
   return (
     <footer className="status">
@@ -68,7 +77,7 @@ export const StatusBar = memo(function StatusBar({ tab, doc, onReload, onSave }:
           </button>
         </span>
       )}
-      <span className="status-path">{tab.label ?? tab.path}</span>
+      <Breadcrumbs tab={tab} base={base} />
       <span className="status-spacer" />
       {doc.shape.lossy && (
         <span className="status-warn">
@@ -81,6 +90,7 @@ export const StatusBar = memo(function StatusBar({ tab, doc, onReload, onSave }:
       <span>{counts.words} palavras</span>
       <span>{counts.characters} caracteres</span>
       <span>{counts.minutes} min de leitura</span>
+      <span className="status-version">{__APP_VERSION__}</span>
     </footer>
   )
 })

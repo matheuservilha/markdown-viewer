@@ -188,3 +188,33 @@ export const PanelRightIcon = (p: IconProps) => (
     <path d="M14.5 4.5v15" />
   </Icon>
 )
+
+/**
+ * One icon that becomes the other, rather than two that swap.
+ *
+ * It shows where the click leads, not where the theme is: a sun in the dark,
+ * because pressing it brings the light. The sun turns into a moon without any
+ * change of image. A second circle, punched out of the disc by a mask, slides
+ * in from the corner and bites the edge into a crescent, while the rays shrink
+ * and rotate away. Which of the two it rests on is decided in CSS, by the
+ * theme on the root, so this component has no state and no props to forget.
+ */
+export const ThemeIcon = ({ size = 16 }: IconProps) => (
+  <svg className="theme-icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+    <mask id="theme-icon-bite">
+      <rect x="0" y="0" width="24" height="24" fill="#fff" />
+      <circle className="theme-icon-bite" cx="18" cy="6" r="7" fill="#000" />
+    </mask>
+    <circle cx="12" cy="12" r="5.6" fill="currentColor" mask="url(#theme-icon-bite)" />
+    <g className="theme-icon-rays" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.2" y1="4.2" x2="5.6" y2="5.6" />
+      <line x1="18.4" y1="18.4" x2="19.8" y2="19.8" />
+      <line x1="19.8" y1="4.2" x2="18.4" y2="5.6" />
+      <line x1="5.6" y1="18.4" x2="4.2" y2="19.8" />
+    </g>
+  </svg>
+)

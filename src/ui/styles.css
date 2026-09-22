@@ -288,6 +288,10 @@ a:focus-visible,
   min-height: 0;
   overflow: hidden;
   background: var(--bg-sidebar);
+
+  /* Named so the brand row can ask how much room it has, which is a question
+     about this panel and not about the window. */
+  container: sidebar / inline-size;
 }
 
 /*
@@ -337,6 +341,27 @@ a:focus-visible,
   letter-spacing: -0.01em;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/*
+ * The name goes rather than gets cut.
+ *
+ * Whole, it wants 135px, and the mark and the three buttons want the rest, so
+ * the name only fits entire from a sidebar of 283px up, measured rather than
+ * guessed. "markdo..." names nothing and still charges the full width for it:
+ * the mark alone says
+ * the same thing in a quarter of the space, and the window title carries the
+ * name for anyone who needs it spelled out. The mark keeps its size, and the
+ * buttons keep the right edge they already had.
+ */
+@container sidebar (max-width: 282px) {
+  .brand-name {
+    display: none;
+  }
+
+  .brand > svg {
+    margin-right: auto;
+  }
 }
 
 /* Small square icon button, used in the brand row and the top bar. */
@@ -852,6 +877,18 @@ a:focus-visible,
   font-style: italic;
 }
 
+/*
+ * The name is cut rather than allowed to set the width of the tab. A note
+ * named after the meeting it came from can run to eighty characters, and one
+ * such tab would otherwise push every other one off the strip.
+ */
+.tab-name {
+  overflow: hidden;
+  max-width: 13rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tab-close {
   display: inline-flex;
   align-items: center;
@@ -911,16 +948,27 @@ a:focus-visible,
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/*
+ * The folder trail, which lives in the status bar at the foot of the window.
+ * The name of the file is already on the tab and again at the head of the
+ * page, so down here the trail is the smallest of the three and only has to
+ * answer where the file is, not what it is called.
+ */
 .crumbs {
   display: flex;
-  flex: 1;
+  flex: 0 1 auto;
   gap: 0.3125rem;
   align-items: center;
-  min-width: 0;
+  min-width: 4rem;
   overflow: hidden;
-  color: var(--text-tertiary);
-  font-size: 0.75rem;
+  color: inherit;
+  font-size: inherit;
   white-space: nowrap;
+}
+
+.crumbs .crumb.is-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crumb {
@@ -1195,13 +1243,6 @@ a:focus-visible,
   color: var(--text-disabled);
   font-size: 0.65625rem;
   white-space: nowrap;
-}
-
-.status-path {
-  flex: 0 1 auto;
-  min-width: 4rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .status-spacer {
@@ -1739,4 +1780,88 @@ a:focus-visible,
 
 .dialog-button.is-destructive {
   color: var(--tone-red);
+}
+
+/* ------------------------------------------------- troca de tema */
+
+/*
+ * The theme button's icon, which is one shape that becomes the other.
+ *
+ * The bite is a circle punched out of the disc by a mask. Parked outside the
+ * disc it takes nothing away and the shape reads as a sun; slid over the edge
+ * it leaves a crescent. The rays shrink into the middle as it arrives, so the
+ * two halves of the change finish together.
+ */
+.theme-icon {
+  display: block;
+  overflow: visible;
+}
+
+.theme-icon-bite {
+  transform: translate(7px, -7px);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-icon-rays {
+  transform-origin: 12px 12px;
+  opacity: 1;
+  transition:
+    transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s;
+}
+
+:root[data-theme='light'] .theme-icon-bite {
+  transform: translate(0, 0);
+}
+
+:root[data-theme='light'] .theme-icon-rays {
+  opacity: 0;
+  transform: scale(0.35) rotate(-60deg);
+}
+
+/*
+ * The change of theme itself, revealed through a circle that opens from the
+ * button. The browser cross-fades the two snapshots by default, which would
+ * fight the circle, so both animations are turned off and the new one is
+ * stacked on top. What actually grows is a `clip-path` on the new snapshot,
+ * set from `theme-transition.ts`, because only that file knows where the
+ * button is.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-icon-bite,
+  .theme-icon-rays {
+    transition: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+/*
+ * The version, at the far end of the status bar. It is the dimmest thing in
+ * the window on purpose: worth being able to find when reporting a problem,
+ * never worth reading while writing.
+ */
+.status-version {
+  flex: 0 0 auto;
+  color: var(--text-disabled);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
 }

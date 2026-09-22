@@ -23,7 +23,13 @@
     "react/exhaustive-deps": "warn",
     "react/rules-of-hooks": "error",
     "react/react-in-jsx-scope": "off",
-    "no-await-in-loop": "off"
+    "no-await-in-loop": "off",
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["__APP_VERSION__"]
+      }
+    ]
   },
   "overrides": [
     {

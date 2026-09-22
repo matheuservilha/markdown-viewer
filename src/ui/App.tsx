@@ -21,7 +21,6 @@ import { exportPdf } from '~/editor/export-pdf'
 import { fileSystem, isDesktop, platform } from '~/platform'
 import { onOpenedPaths } from '~/platform/opened'
 import { supportsDirectoryPicker } from '~/platform/fs-browser'
-import { Breadcrumbs } from './Breadcrumbs'
 import { EditorPane } from './EditorPane'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { Dialog, type DialogChoice } from './Dialog'
@@ -30,6 +29,7 @@ import { installAppMenu, menuPlan, type CommandId } from './app-menu'
 import { FileTree, type TreeData, type TreeHandlers } from './FileTree'
 import { InfoPanel } from './InfoPanel'
 import { MeasureGuides } from './MeasureGuides'
+import { centreOf, changeTheme } from './theme-transition'
 import { UpdateNotice } from './UpdateNotice'
 import { Recents } from './Recents'
 import { SettingsWindow } from './SettingsWindow'
@@ -47,11 +47,10 @@ import {
   FolderPlusIcon,
   MoreIcon,
   PanelRightIcon,
-  MoonIcon,
   SearchIcon,
   SettingsIcon,
   SidebarIcon,
-  SunIcon,
+  ThemeIcon,
 } from './icons'
 import { useResolvedTheme } from './useTheme'
 
@@ -718,9 +717,13 @@ export function App() {
             className="icon-button"
             aria-label={dark ? 'Usar o tema claro' : 'Usar o tema escuro'}
             title={dark ? 'Usar o tema claro' : 'Usar o tema escuro'}
-            onClick={() => update('themeMode', dark ? 'light' : 'dark')}
+            onClick={(event) =>
+              changeTheme(centreOf(event.currentTarget), () =>
+                update('themeMode', dark ? 'light' : 'dark'),
+              )
+            }
           >
-            {dark ? <MoonIcon size={16} /> : <SunIcon size={16} />}
+            <ThemeIcon size={16} />
           </button>
           <button
             type="button"
@@ -886,10 +889,6 @@ export function App() {
             includes the only way back from a collapsed sidebar. */}
         {activeTab && (
           <header className="topbar" data-drag-window>
-            <Breadcrumbs
-              tab={activeTab}
-              base={state.bases.find((base) => base.id === activeTab.baseId)}
-            />
             {activeDoc && (
               <span className="save-state" data-state={activeDoc.dirty ? 'dirty' : 'saved'}>
                 <span className="save-dot" />
@@ -982,6 +981,7 @@ export function App() {
         <StatusBar
           tab={activeTab}
           doc={activeDoc}
+          base={activeTab ? state.bases.find((base) => base.id === activeTab.baseId) : undefined}
           onSave={saveActive}
           onReload={() => state.activeId && void actions.reload(state.activeId)}
         />
