@@ -2386,10 +2386,23 @@ html[data-window='dock'] .chip {
   padding: 0 0.875rem;
 }
 
-/* Nothing in a glance is meant to be selected or typed in. */
-.peek .cm-cursor,
-.peek .cm-dropCursor {
+/*
+ * Nothing in a glance is meant to be typed in, so it has no caret.
+ *
+ * The kept note shares this class and is the opposite: it is a note somebody
+ * clicked in order to write in it, and a text field with no caret is a text
+ * field that looks broken. Hence the exception, spelled out rather than
+ * relying on the editor to hide its own caret when it is not editable.
+ */
+.peek:not(.is-kept) .cm-cursor,
+.peek:not(.is-kept) .cm-dropCursor {
   display: none !important;
+}
+
+/* And the pointer says so on the way in: a beam over the text of a note you
+   can write in, the ordinary arrow over one you cannot. */
+.peek.is-kept .cm-content {
+  cursor: text;
 }
 
 .peek-gone {
