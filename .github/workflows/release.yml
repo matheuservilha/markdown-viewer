@@ -65,12 +65,15 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # WebKitGTK and the AppImage packer only exist on the Linux runner.
+      # WebKitGTK and the AppImage packer only exist on the Linux runner. The
+      # Ayatana indicator is what draws the icon beside the clock there, and
+      # without the app closed to the tray would be an app with no way back.
       - name: Instala as dependências de sistema do Linux
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - run: npm ci
 
